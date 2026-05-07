@@ -1,0 +1,57 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net8.0-windows</TargetFrameworks>
+    <UseWindowsForms Condition="'$(TargetFramework)' == 'net8.0-windows'">true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>SoftAgility.Beacon</RootNamespace>
+    <AssemblyName>SoftAgility.Beacon</AssemblyName>
+    <DefaultItemExcludes>$(DefaultItemExcludes);tests\**</DefaultItemExcludes>
+
+    <!-- NuGet Package Metadata -->
+    <PackageId>SoftAgility.Beacon</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>SoftAgility</Authors>
+    <Company>SoftAgility</Company>
+    <Copyright>Copyright (c) 2026 SoftAgility</Copyright>
+    <Description>SoftAgility Beacon .NET SDK — track usage events, manage sessions, capture exceptions, and queue events offline. Buffered, batched, durable, thread-safe.</Description>
+    <PackageTags>analytics;tracking;beacon;usage;telemetry;sdk</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageProjectUrl>https://github.com/softagility/beacon-sdk-dotnet</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/softagility/beacon-sdk-dotnet</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <IsPackable>true</IsPackable>
+
+    <!-- Symbol package + SourceLink for debugger step-through experience -->
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <DebugType>portable</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="SoftAgility.Beacon.Tests" />
+  </ItemGroup>
+
+  <!-- Files included in the NuGet package -->
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+    <None Include="LICENSE" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.0" />
+
+    <!-- SourceLink — embeds GitHub source pointers for IDE step-through. PrivateAssets="All"
+         keeps the package out of consumers' transitive dependency tree. -->
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
+  </ItemGroup>
+
+</Project>

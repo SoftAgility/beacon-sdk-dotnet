@@ -1,0 +1,78 @@
+name: Release to NuGet
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g. 1.0.0). If empty, uses tag name.'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Pack + push SoftAgility.Beacon
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # SourceLink embeds correct git commit info — needs full history
+          fetch-depth: 0
+
+      - name: Set up .NET (SDK + tests)
+        uses: actions/setup-dotnet@v4
+        with:
+          # SDK targets net8.0 / net8.0-windows; tests target net10.0
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Publishing version: $VERSION"
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build -c Release --no-restore -p:Version=${{ steps.version.outputs.VERSION }}
+
+      - name: Test
+        run: dotnet test -c Release --no-build --logger "console;verbosity=detailed"
+
+      - name: Pack
+        run: |
+          dotnet pack SoftAgility.Beacon.csproj \
+            -c Release \
+            --no-build \
+            -p:Version=${{ steps.version.outputs.VERSION }} \
+            -o ./artifacts
+
+      - name: Inspect package contents
+        run: |
+          ls -la ./artifacts
+          echo "--- main package ---"
+          unzip -l ./artifacts/SoftAgility.Beacon.${{ steps.version.outputs.VERSION }}.nupkg
+          echo "--- symbol package ---"
+          unzip -l ./artifacts/SoftAgility.Beacon.${{ steps.version.outputs.VERSION }}.snupkg
+
+      - name: Push to NuGet
+        run: |
+          dotnet nuget push artifacts/SoftAgility.Beacon.${{ steps.version.outputs.VERSION }}.nupkg \
+            --api-key ${{ secrets.NUGET_API_KEY }} \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate
+        env:
+          # dotnet nuget push auto-pushes the matching .snupkg in the same directory
+          DOTNET_NOLOGO: 'true'

@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="SoftAgility.Beacon.csproj" />
+  <Project Path="tests/SoftAgility.Beacon.Tests.csproj" />
+</Solution>
