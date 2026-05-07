@@ -3,6 +3,10 @@
   <PropertyGroup>
     <TargetFrameworks>net8.0;net8.0-windows</TargetFrameworks>
     <UseWindowsForms Condition="'$(TargetFramework)' == 'net8.0-windows'">true</UseWindowsForms>
+    <!-- Allow Linux + macOS CI runners to cross-compile the net8.0-windows target.
+         The produced binaries only run on Windows, but they pack correctly into the
+         .nupkg so consumers on any host platform get the right TFM at install time. -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>SoftAgility.Beacon</RootNamespace>
