@@ -132,6 +132,15 @@ internal sealed class BeaconHttpClient : IDisposable
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
 
             using var response = await _httpClient.SendAsync(request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                var responseBody = await ReadBodyTruncatedAsync(response, cancellationToken);
+                _logger?.LogWarning(
+                    "Beacon: session start POST returned HTTP {StatusCode} for session {SessionId}{BodySuffix}",
+                    (int)response.StatusCode,
+                    sessionId,
+                    string.IsNullOrEmpty(responseBody) ? "" : $" — {responseBody}");
+            }
             return response.IsSuccessStatusCode;
         }
         catch (OperationCanceledException)
@@ -171,6 +180,15 @@ internal sealed class BeaconHttpClient : IDisposable
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
 
             using var response = await _httpClient.SendAsync(request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                var responseBody = await ReadBodyTruncatedAsync(response, cancellationToken);
+                _logger?.LogWarning(
+                    "Beacon: session end POST returned HTTP {StatusCode} for session {SessionId}{BodySuffix}",
+                    (int)response.StatusCode,
+                    sessionId,
+                    string.IsNullOrEmpty(responseBody) ? "" : $" — {responseBody}");
+            }
             return response.IsSuccessStatusCode;
         }
         catch (OperationCanceledException)
@@ -204,9 +222,11 @@ internal sealed class BeaconHttpClient : IDisposable
             if (response.IsSuccessStatusCode)
                 return true;
 
+            var responseBody = await ReadBodyTruncatedAsync(response, cancellationToken);
             _logger?.LogWarning(
-                "Beacon: failed to send exception report — HTTP {StatusCode}.",
-                (int)response.StatusCode);
+                "Beacon: failed to send exception report — HTTP {StatusCode}{BodySuffix}",
+                (int)response.StatusCode,
+                string.IsNullOrEmpty(responseBody) ? "" : $" — {responseBody}");
             return false;
         }
         catch (OperationCanceledException)
@@ -258,6 +278,15 @@ internal sealed class BeaconHttpClient : IDisposable
                     "Beacon: device ID {DeviceId} is already linked to a different user. Identity link not recorded.",
                     anonymousActorId);
             }
+            else if (!response.IsSuccessStatusCode)
+            {
+                var responseBody = await ReadBodyTruncatedAsync(response, CancellationToken.None);
+                _logger?.LogWarning(
+                    "Beacon: identify POST returned HTTP {StatusCode} for device {DeviceId}{BodySuffix}",
+                    (int)response.StatusCode,
+                    anonymousActorId,
+                    string.IsNullOrEmpty(responseBody) ? "" : $" — {responseBody}");
+            }
 
             return response.IsSuccessStatusCode;
         }
@@ -281,6 +310,30 @@ internal sealed class BeaconHttpClient : IDisposable
                 IsSuccess = true
             };
         }
+
+        // For all non-2xx and non-207 paths, read the response body once. The
+        // body usually contains a structured error from the backend (e.g.
+        // "Product 'foo' is not registered", "API key rejected") that the
+        // FlushResult.ErrorMessage should surface to the integrator's
+        // ILogger. Truncate to 500 chars so a giant 5xx HTML page can't
+        // flood the customer's logs.
+        var body = string.Empty;
+        if (statusCode != HttpStatusCode.MultiStatus)
+        {
+            try
+            {
+                body = await response.Content.ReadAsStringAsync(cancellationToken);
+                if (body.Length > 500)
+                {
+                    body = body[..500] + "...(truncated)";
+                }
+            }
+            catch
+            {
+                // Body read failed — proceed with empty string.
+            }
+        }
+        var bodySuffix = string.IsNullOrEmpty(body) ? string.Empty : $" — {body}";
 
         // 207 Multi-Status (partial success)
         if (statusCode == HttpStatusCode.MultiStatus)
@@ -330,7 +383,7 @@ internal sealed class BeaconHttpClient : IDisposable
             {
                 StatusCode = statusCode,
                 IsUnauthorized = true,
-                ErrorMessage = "Beacon: API key rejected (401). Check BeaconOptions.ApiKey. Event delivery halted."
+                ErrorMessage = $"Beacon: API key rejected (401). Check BeaconOptions.ApiKey. Event delivery halted.{bodySuffix}"
             };
         }
 
@@ -341,7 +394,7 @@ internal sealed class BeaconHttpClient : IDisposable
             {
                 StatusCode = statusCode,
                 IsHardCapped = true,
-                ErrorMessage = "Beacon: Account is hard-capped (402). Events queued to disk. They will be retried after plan upgrade."
+                ErrorMessage = $"Beacon: Account is hard-capped (402). Events queued to disk. They will be retried after plan upgrade.{bodySuffix}"
             };
         }
 
@@ -363,7 +416,7 @@ internal sealed class BeaconHttpClient : IDisposable
                 StatusCode = statusCode,
                 IsRateLimited = true,
                 RetryAfterSeconds = retryAfter,
-                ErrorMessage = $"Beacon: rate limited (429). Retrying after {retryAfter} seconds."
+                ErrorMessage = $"Beacon: rate limited (429). Retrying after {retryAfter} seconds.{bodySuffix}"
             };
         }
 
@@ -374,7 +427,7 @@ internal sealed class BeaconHttpClient : IDisposable
             {
                 StatusCode = statusCode,
                 IsServerError = true,
-                ErrorMessage = $"Beacon: server error ({(int)statusCode})."
+                ErrorMessage = $"Beacon: server error ({(int)statusCode}).{bodySuffix}"
             };
         }
 
@@ -385,7 +438,7 @@ internal sealed class BeaconHttpClient : IDisposable
             {
                 StatusCode = statusCode,
                 IsClientError = true,
-                ErrorMessage = $"Beacon: client error ({(int)statusCode}). Events dropped — this error is permanent."
+                ErrorMessage = $"Beacon: client error ({(int)statusCode}). Events dropped — this error is permanent.{bodySuffix}"
             };
         }
 
@@ -394,8 +447,27 @@ internal sealed class BeaconHttpClient : IDisposable
         {
             StatusCode = statusCode,
             IsNetworkError = true,
-            ErrorMessage = $"Beacon: unexpected HTTP {(int)statusCode}."
+            ErrorMessage = $"Beacon: unexpected HTTP {(int)statusCode}.{bodySuffix}"
         };
+    }
+
+    /// <summary>
+    /// Reads the response body and truncates to 500 chars for safe logging.
+    /// Used by the per-endpoint helpers (session start/end, identify, exception)
+    /// to surface the backend's structured error message to the integrator's logger.
+    /// </summary>
+    private static async Task<string> ReadBodyTruncatedAsync(
+        HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            return body.Length > 500 ? body[..500] + "...(truncated)" : body;
+        }
+        catch
+        {
+            return string.Empty;
+        }
     }
 
     public void Dispose()

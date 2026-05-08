@@ -62,8 +62,8 @@ public sealed class BreadcrumbTests : IDisposable
 
     /// <summary>
     /// Keeps accepting HTTP requests (responding 200) until one arrives at /v1/events/exceptions,
-    /// then returns the body. This handles the preflight and any batch flush requests that
-    /// Track() may trigger before TrackException fires its POST.
+    /// then returns the body. This handles any batch flush requests that Track() may trigger
+    /// before TrackException fires its POST.
     /// </summary>
     private async Task<string> CaptureExceptionBodyAsync(CancellationToken ct = default)
     {

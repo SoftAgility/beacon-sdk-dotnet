@@ -69,7 +69,7 @@ public sealed class ExceptionTrackingTests : IDisposable
 
     /// <summary>
     /// Helper: captures the first HTTP request to /v1/events/exceptions.
-    /// Responds 200 to any other requests (e.g., preflight, session start) until the
+    /// Responds 200 to any other requests (e.g., session start) until the
     /// exception endpoint is hit.
     /// </summary>
     private async Task<(string? path, string? body, string? authHeader)> CaptureExceptionRequestAsync(
@@ -201,7 +201,7 @@ public sealed class ExceptionTrackingTests : IDisposable
         var tracker = CreateTrackerWithListener();
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
-        // StartSession triggers a preflight and session-start HTTP call.
+        // StartSession triggers a session-start HTTP call.
         // We handle all non-exception requests inside CaptureExceptionRequestAsync.
         tracker.StartSession("actor-1");
         await Task.Delay(200); // Let session state settle
@@ -210,7 +210,7 @@ public sealed class ExceptionTrackingTests : IDisposable
         var sessionId = TrackerTestHelper.GetSessionId(tracker);
         sessionId.Should().NotBeNull("session should be active");
 
-        // Now capture the exception POST (auto-handles preflight and session-start)
+        // Now capture the exception POST (auto-handles session-start)
         var captureTask = CaptureExceptionRequestAsync(ct: cts.Token);
         var ex = new Exception("test error");
 

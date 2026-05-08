@@ -87,7 +87,6 @@ public sealed class BeaconTracker : IBeaconTracker
     private bool _environmentSent;
     private bool _disposed;
     private bool _halted; // Set on 401 — no further flush attempts
-    private int _preflightDone; // 0 = not started, 1 = done (Interlocked)
     private int _memoryQueueCount; // Approximate count for size-triggered flush
 
     // Consent and identity fields (FR-1119 through FR-1126)
@@ -330,8 +329,6 @@ public sealed class BeaconTracker : IBeaconTracker
                 return;
             }
 
-            TriggerPreflight();
-
             ValidateActorId(actorId);
 
             // Truncate category/name to documented limits
@@ -442,7 +439,6 @@ public sealed class BeaconTracker : IBeaconTracker
             if (IsOptedOut)
                 return;
 
-            TriggerPreflight();
             ValidateActorId(actorId);
 
             lock (_sessionLock)
@@ -1040,44 +1036,6 @@ public sealed class BeaconTracker : IBeaconTracker
             return;
 
         _ = Task.Run(() => FlushCoreAsync(_shutdownCts.Token, waitForSemaphore: false));
-    }
-
-    /// <summary>
-    /// Fires a single background empty-batch POST to validate the API key early.
-    /// Called once on first Track()/StartSession(). If the server returns 401,
-    /// the SDK halts immediately instead of waiting for the first flush timer.
-    /// Network/server errors are ignored (offline-first design).
-    /// </summary>
-    private void TriggerPreflight()
-    {
-        if (Interlocked.CompareExchange(ref _preflightDone, 1, 0) != 0)
-            return; // Already triggered
-
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                if (_httpClient is null || _halted)
-                    return;
-
-                var result = await _httpClient.SendEventsAsync([], null, _shutdownCts.Token);
-
-                if (result.IsUnauthorized)
-                {
-                    _halted = true;
-                    _logger?.LogError("{Message}", result.ErrorMessage);
-                    LastFlushStatus = FlushStatus.Offline;
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                // Shutdown in progress — ignore
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogWarning(ex, "Beacon: preflight check failed (non-fatal).");
-            }
-        });
     }
 
     private async Task FlushCoreAsync(CancellationToken cancellationToken, bool waitForSemaphore = false)
