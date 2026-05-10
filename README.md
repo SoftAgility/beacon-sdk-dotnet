@@ -129,7 +129,7 @@ NuGet's automatic best-match resolution picks the right TFM at install time. No 
 
 ## Examples
 
-A working WinForms example app lives at [`sdk/examples/dotnet-winforms`](https://github.com/softagility/beacon/tree/main/sdk/examples/dotnet-winforms) in the main repo — covers DI registration, Identify, Track, sessions, exception reporting, and graceful shutdown.
+A working WinForms example app lives at [`examples/winforms/`](examples/winforms/) — covers DI registration, Identify, Track, sessions, exception reporting, and graceful shutdown. References `SoftAgility.Beacon` via NuGet (1.0.1), so it builds standalone after `dotnet restore`.
 
 ---
 
