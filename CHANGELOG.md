@@ -6,6 +6,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-05-26
+
+### Added
+
+- **Account and license context.** New `SetAccount(string)` / `ClearAccount()` / `SetLicense(string)` / `ClearLicense()` methods on `IBeaconTracker` carry first-class B2B account and license identifiers through every event, session start, and exception report. Account/license context is stored in-process under the existing `_sessionLock`, applied to every subsequent payload until cleared or `Reset()` is called, and validated for 1-256 chars + no control characters (matching the backend `EventValidator`). When no context is set, the `account_id` / `license_id` JSON fields are OMITTED entirely from the payload rather than serialized as null — the backend distinguishes "not present" from "present but invalid". `Reset()` now clears account and license context in addition to actor identity and queued events.
+
+### Fixed
+
+- **Main `.csproj` no longer compiles the `examples/` directory.** `SoftAgility.Beacon.csproj` now excludes `examples/**` from `DefaultItemExcludes` (it already excluded `tests/**`). The recent `examples/winforms/` addition was being pulled into the library compile, producing a wall of "Type 'Label' could not be found" errors on a clean build. The example project has its own `BeaconExample.InventoryManager.csproj` and was never meant to be part of the SDK assembly.
+
 ## [1.0.1] - 2026-05-08
 
 ### Removed

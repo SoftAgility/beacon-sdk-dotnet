@@ -122,8 +122,8 @@ public interface IBeaconTracker : IDisposable, IAsyncDisposable
     void OptIn();
 
     /// <summary>
-    /// Clears actor identity, session state, in-memory queue, and breadcrumbs,
-    /// then generates a new anonymous device ID.
+    /// Clears actor identity, session state, account context, license context,
+    /// in-memory queue, and breadcrumbs, then generates a new anonymous device ID.
     /// If a session is active, it is ended first (fire-and-forget).
     /// Operates regardless of <see cref="BeaconOptions.Enabled"/> or opt-out state.
     /// After reset, the next <see cref="Track(string, string, object?)"/> or
@@ -131,6 +131,49 @@ public interface IBeaconTracker : IDisposable, IAsyncDisposable
     /// Never throws.
     /// </summary>
     void Reset();
+
+    /// <summary>
+    /// Sets the account context for subsequent events, sessions, and exception reports.
+    /// </summary>
+    /// <param name="accountId">
+    /// An opaque identifier for the vendor's customer account / organization
+    /// (1-256 chars; opaque; never validated). Pseudonymous IDs only — do not
+    /// pass personally identifying strings like email addresses. Cleared by
+    /// <see cref="ClearAccount"/> or <see cref="Reset"/>.
+    /// </param>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="accountId"/> is null, empty, whitespace-only,
+    /// contains a control character, or exceeds 256 characters.
+    /// </exception>
+    void SetAccount(string accountId);
+
+    /// <summary>
+    /// Clears the account context. Subsequent events emit with account_id = null.
+    /// </summary>
+    void ClearAccount();
+
+    /// <summary>
+    /// Sets the license context for subsequent events, sessions, and exception reports.
+    /// </summary>
+    /// <param name="licenseId">
+    /// An opaque identifier for the license, contract, or entitlement under which
+    /// usage is occurring. <strong>Prefer per-contract IDs</strong> (a single string shared
+    /// across all of a customer's users — e.g., a subscription ID, site key, or
+    /// bundle SKU) for the richest Beacon analytics. Per-user license IDs work but
+    /// reduce the License Detail page to a near-duplicate of the Actor Identities
+    /// view and disable the multi-account-sharing warning. See the Beacon docs
+    /// section "Modeling licenses" for guidance.
+    /// </param>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="licenseId"/> is null, empty, whitespace-only,
+    /// contains a control character, or exceeds 256 characters.
+    /// </exception>
+    void SetLicense(string licenseId);
+
+    /// <summary>
+    /// Clears the license context. Subsequent events emit with license_id = null.
+    /// </summary>
+    void ClearLicense();
 
     /// <summary>
     /// The result of the most recent flush attempt.

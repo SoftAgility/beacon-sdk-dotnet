@@ -105,24 +105,43 @@ internal sealed class BeaconHttpClient : IDisposable
     /// <summary>
     /// Sends a session start request to POST /v1/events/sessions.
     /// </summary>
+    /// <param name="accountId">
+    /// Account context set via <c>SetAccount</c>, or null when no account is set.
+    /// When null the field is OMITTED from the request body — see account-license-context
+    /// PRD §8.1 ("Null/empty/cleared values OMIT the field entirely from the JSON").
+    /// </param>
+    /// <param name="licenseId">
+    /// License context set via <c>SetLicense</c>, or null when no license is set.
+    /// When null the field is OMITTED from the request body.
+    /// </param>
     public async Task<bool> SendSessionStartAsync(
         string sessionId,
         string actorId,
         string sourceApp,
         string sourceVersion,
         DateTimeOffset startedAt,
+        string? accountId = null,
+        string? licenseId = null,
         CancellationToken cancellationToken = default)
     {
         try
         {
-            var body = new
+            // Use a Dictionary so account_id / license_id can be omitted (not serialized as null)
+            // when no context is set — matches the Track() payload pattern in BeaconTracker.cs.
+            var body = new Dictionary<string, object?>
             {
-                SessionId = sessionId,
-                ActorId = actorId,
-                SourceApp = sourceApp,
-                SourceVersion = sourceVersion,
-                StartedAt = startedAt.ToString("O")
+                ["session_id"] = sessionId,
+                ["actor_id"] = actorId,
+                ["source_app"] = sourceApp,
+                ["source_version"] = sourceVersion,
+                ["started_at"] = startedAt.ToString("O")
             };
+
+            if (accountId is not null)
+                body["account_id"] = accountId;
+
+            if (licenseId is not null)
+                body["license_id"] = licenseId;
 
             using var request = new HttpRequestMessage(HttpMethod.Post, "v1/events/sessions");
             request.Content = new StringContent(

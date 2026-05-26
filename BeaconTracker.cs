@@ -84,6 +84,8 @@ public sealed class BeaconTracker : IBeaconTracker
 
     private string? _sessionId;
     private string? _actorId;
+    private string? _accountId;
+    private string? _licenseId;
     private bool _environmentSent;
     private bool _disposed;
     private bool _halted; // Set on 401 — no further flush attempts
@@ -342,9 +344,13 @@ public sealed class BeaconTracker : IBeaconTracker
 
             // Build event payload
             string? sessionId;
+            string? accountId;
+            string? licenseId;
             lock (_sessionLock)
             {
                 sessionId = _sessionId;
+                accountId = _accountId;
+                licenseId = _licenseId;
             }
 
             var payload = new Dictionary<string, object?>
@@ -360,6 +366,15 @@ public sealed class BeaconTracker : IBeaconTracker
 
             if (sessionId is not null)
                 payload["session_id"] = sessionId;
+
+            // account-license-context PRD §8.1: include when set; OMIT when null
+            // (do not send "account_id": null — the ingestion validator distinguishes
+            // "not present" from "present but invalid").
+            if (accountId is not null)
+                payload["account_id"] = accountId;
+
+            if (licenseId is not null)
+                payload["license_id"] = licenseId;
 
             if (sanitized is not null)
                 payload["properties"] = sanitized;
@@ -456,6 +471,11 @@ public sealed class BeaconTracker : IBeaconTracker
                 _sessionId = newSessionId;
                 _environmentSent = false; // Reset so env data is sent on next flush
 
+                // Snapshot account/license context for the session-start payload
+                // (account-license-context PRD §8.1)
+                var sessionAccountId = _accountId;
+                var sessionLicenseId = _licenseId;
+
                 // Send session start to the backend (fire and forget)
                 _ = Task.Run(async () =>
                 {
@@ -468,7 +488,9 @@ public sealed class BeaconTracker : IBeaconTracker
                                 actorId,
                                 _options.AppName,
                                 _options.AppVersion,
-                                DateTimeOffset.UtcNow);
+                                DateTimeOffset.UtcNow,
+                                sessionAccountId,
+                                sessionLicenseId);
                         }
                     }
                     catch (Exception ex)
@@ -647,8 +669,11 @@ public sealed class BeaconTracker : IBeaconTracker
                     // _sessionId is cleared by EndSessionInternal
                 }
 
-                // Step 2: Clear actor ID
+                // Step 2: Clear actor ID and account/license context
+                // (account-license-context PRD §8.1: Reset() clears both)
                 _actorId = null;
+                _accountId = null;
+                _licenseId = null;
             }
 
             // Step 3: Drain in-memory queue
@@ -681,6 +706,94 @@ public sealed class BeaconTracker : IBeaconTracker
         {
             _logger?.LogWarning(ex, "Beacon: error in Reset().");
         }
+    }
+
+    // ── Account / License Context (account-license-context PRD §8.1) ──
+
+    /// <inheritdoc />
+    public void SetAccount(string accountId)
+    {
+        if (_disposed)
+            return;
+
+        if (!_options.Enabled)
+            return;
+
+        var trimmed = ValidateAndTrimContextId(accountId, nameof(accountId));
+
+        lock (_sessionLock)
+        {
+            _accountId = trimmed;
+        }
+    }
+
+    /// <inheritdoc />
+    public void ClearAccount()
+    {
+        if (_disposed)
+            return;
+
+        lock (_sessionLock)
+        {
+            _accountId = null;
+        }
+    }
+
+    /// <inheritdoc />
+    public void SetLicense(string licenseId)
+    {
+        if (_disposed)
+            return;
+
+        if (!_options.Enabled)
+            return;
+
+        var trimmed = ValidateAndTrimContextId(licenseId, nameof(licenseId));
+
+        lock (_sessionLock)
+        {
+            _licenseId = trimmed;
+        }
+    }
+
+    /// <inheritdoc />
+    public void ClearLicense()
+    {
+        if (_disposed)
+            return;
+
+        lock (_sessionLock)
+        {
+            _licenseId = null;
+        }
+    }
+
+    /// <summary>
+    /// Validates an account or license ID per PRD §8.1: 1-256 chars after trim,
+    /// no control characters. Returns the trimmed string. Throws ArgumentException
+    /// on any violation. Matches backend EventValidator.ValidateOptionalAccountOrLicenseId.
+    /// </summary>
+    private static string ValidateAndTrimContextId(string value, string paramName)
+    {
+        if (string.IsNullOrEmpty(value))
+            throw new ArgumentException($"{paramName} must not be null or empty.", paramName);
+
+        var trimmed = value.Trim();
+
+        if (string.IsNullOrEmpty(trimmed))
+            throw new ArgumentException($"{paramName} must not be whitespace.", paramName);
+
+        if (trimmed.Length > 256)
+            throw new ArgumentException($"{paramName} must not exceed 256 characters.", paramName);
+
+        foreach (var c in trimmed)
+        {
+            if (char.IsControl(c))
+                throw new ArgumentException(
+                    $"{paramName} must not contain control characters.", paramName);
+        }
+
+        return trimmed;
     }
 
     // ── Exception Tracking ────────────────────────────────────────────
@@ -772,11 +885,16 @@ public sealed class BeaconTracker : IBeaconTracker
         if (string.IsNullOrEmpty(stackTrace))
             stackTrace = null;
 
-        // Capture session ID
+        // Capture session ID + account/license context
+        // (account-license-context PRD §8.1: exception reports include account/license when set)
         string? sessionId;
+        string? exceptionAccountId;
+        string? exceptionLicenseId;
         lock (_sessionLock)
         {
             sessionId = _sessionId;
+            exceptionAccountId = _accountId;
+            exceptionLicenseId = _licenseId;
         }
 
         // Snapshot breadcrumbs (FR-489)
@@ -802,6 +920,13 @@ public sealed class BeaconTracker : IBeaconTracker
             ["stack_trace"] = stackTrace,
             ["session_id"] = sessionId
         };
+
+        // OMIT when null (per PRD §8.1) — ingest distinguishes "not present" from "invalid"
+        if (exceptionAccountId is not null)
+            payload["account_id"] = exceptionAccountId;
+
+        if (exceptionLicenseId is not null)
+            payload["license_id"] = exceptionLicenseId;
 
         if (breadcrumbSnapshot is not null)
             payload["breadcrumbs"] = breadcrumbSnapshot;
