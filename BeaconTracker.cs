@@ -26,7 +26,7 @@ public sealed class BeaconTracker : IBeaconTracker
     /// <summary>
     /// Configures and creates the singleton BeaconTracker instance.
     /// Throws <see cref="InvalidOperationException"/> if called a second time.
-    /// If required options (ApiKey, ApiBaseUrl, AppName) are missing, the SDK
+    /// If required options (ApiKey, ApiBaseUrl, Product) are missing, the SDK
     /// disables itself silently and logs a warning — it does not throw.
     /// </summary>
     public static void Configure(Action<BeaconOptions> configure)
@@ -64,7 +64,7 @@ public sealed class BeaconTracker : IBeaconTracker
 
     /// <summary>
     /// Characters that are invalid in Windows directory names.
-    /// Used by <see cref="SanitizeAppNameForPath"/> to ensure safe data directory paths.
+    /// Used by <see cref="SanitizeProductForPath"/> to ensure safe data directory paths.
     /// </summary>
     private static readonly char[] InvalidPathChars = ['<', '>', ':', '"', '/', '\\', '|', '?', '*'];
 
@@ -137,9 +137,9 @@ public sealed class BeaconTracker : IBeaconTracker
         if (_options.MaxBreadcrumbs > 200)
             _options.MaxBreadcrumbs = 200;
 
-        // Truncate AppName/AppVersion to documented limits
-        if (_options.AppName.Length > 128)
-            _options.AppName = _options.AppName[..128];
+        // Truncate Product/AppVersion to documented limits
+        if (_options.Product.Length > 128)
+            _options.Product = _options.Product[..128];
         if (_options.AppVersion.Length > 256)
             _options.AppVersion = _options.AppVersion[..256];
 
@@ -175,7 +175,7 @@ public sealed class BeaconTracker : IBeaconTracker
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "SoftAgility",
                 "Beacon",
-                SanitizeAppNameForPath(_options.AppName),
+                SanitizeProductForPath(_options.Product),
                 "queue.db");
             _diskQueue = new DiskQueue(queuePath, _logger);
         }
@@ -258,7 +258,7 @@ public sealed class BeaconTracker : IBeaconTracker
                         await httpClient.PostIdentifyAsync(
                             deviceId,
                             actorId,
-                            _options.AppName,
+                            _options.Product,
                             _options.AppVersion);
                     }
                     catch (Exception ex)
@@ -360,7 +360,7 @@ public sealed class BeaconTracker : IBeaconTracker
                 ["name"] = name,
                 ["timestamp"] = DateTimeOffset.UtcNow.ToString("O"),
                 ["actor_id"] = actorId,
-                ["source_app"] = _options.AppName,
+                ["product"] = _options.Product,
                 ["source_version"] = _options.AppVersion
             };
 
@@ -486,7 +486,7 @@ public sealed class BeaconTracker : IBeaconTracker
                             await _httpClient.SendSessionStartAsync(
                                 newSessionId,
                                 actorId,
-                                _options.AppName,
+                                _options.Product,
                                 _options.AppVersion,
                                 DateTimeOffset.UtcNow,
                                 sessionAccountId,
@@ -914,7 +914,7 @@ public sealed class BeaconTracker : IBeaconTracker
             ["severity"] = severityString,
             ["occurred_at"] = occurredAt,
             ["actor_id"] = actorId,
-            ["source_app"] = _options.AppName,
+            ["product"] = _options.Product,
             ["source_version"] = _options.AppVersion,
             ["message"] = message,
             ["stack_trace"] = stackTrace,
@@ -960,7 +960,7 @@ public sealed class BeaconTracker : IBeaconTracker
         {
             schema_version = "1",
             generated_at = DateTimeOffset.UtcNow.ToString("O"),
-            source_app = _options.AppName,
+            product = _options.Product,
             source_version = _options.AppVersion,
             entries = _definedEvents.Select(e => new
             {
@@ -1065,12 +1065,12 @@ public sealed class BeaconTracker : IBeaconTracker
     {
         try
         {
-            var sanitizedAppName = SanitizeAppNameForPath(_options.AppName);
+            var sanitizedProduct = SanitizeProductForPath(_options.Product);
             _dataDirectory = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "SoftAgility",
                 "Beacon",
-                sanitizedAppName);
+                sanitizedProduct);
 
             // Create directory if it doesn't exist (ED-736)
             Directory.CreateDirectory(_dataDirectory);
@@ -1126,12 +1126,12 @@ public sealed class BeaconTracker : IBeaconTracker
     }
 
     /// <summary>
-    /// Sanitizes an app name for use as a directory name component (ED-737).
+    /// Sanitizes a product name for use as a directory name component (ED-737).
     /// Replaces path-unsafe characters with underscore.
     /// </summary>
-    private static string SanitizeAppNameForPath(string appName)
+    private static string SanitizeProductForPath(string product)
     {
-        var chars = appName.ToCharArray();
+        var chars = product.ToCharArray();
         for (var i = 0; i < chars.Length; i++)
         {
             if (Array.IndexOf(InvalidPathChars, chars[i]) >= 0)
@@ -1520,9 +1520,9 @@ public sealed class BeaconTracker : IBeaconTracker
             return false;
         }
 
-        if (string.IsNullOrEmpty(options.AppName))
+        if (string.IsNullOrEmpty(options.Product))
         {
-            _logger?.LogWarning("Beacon: AppName is missing or empty. SDK disabled.");
+            _logger?.LogWarning("Beacon: Product is missing or empty. SDK disabled.");
             return false;
         }
 

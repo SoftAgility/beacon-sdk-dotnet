@@ -28,7 +28,7 @@ internal static class TrackerTestHelper
         {
             ApiKey = apiKey,
             ApiBaseUrl = apiBaseUrl,
-            AppName = appName ?? $"Test_{Guid.NewGuid():N}",
+            Product = appName ?? $"Test_{Guid.NewGuid():N}",
             AppVersion = appVersion,
             Enabled = enabled,
             MaxBatchSize = maxBatchSize,

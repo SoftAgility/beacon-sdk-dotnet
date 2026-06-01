@@ -16,7 +16,7 @@ namespace SoftAgility.Beacon.Tests;
 
 /// <summary>
 /// Tests for the Reset() method — identity clearing, queue draining, device ID rotation,
-/// and breadcrumb clearing. Each test uses a unique AppName for directory isolation.
+/// and breadcrumb clearing. Each test uses a unique Product for directory isolation.
 /// </summary>
 public sealed class ResetTests : IDisposable
 {

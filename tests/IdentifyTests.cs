@@ -383,7 +383,7 @@ public sealed class IdentifyPostTests : IDisposable
         {
             ApiKey = "test-key",
             ApiBaseUrl = _baseUrl,
-            AppName = $"Test_{Guid.NewGuid():N}",
+            Product = $"Test_{Guid.NewGuid():N}",
             AppVersion = "2.0.0",
             Enabled = true,
             FlushIntervalSeconds = 3600
@@ -425,7 +425,7 @@ public sealed class IdentifyPostTests : IDisposable
         var root = doc.RootElement;
         root.GetProperty("anonymous_actor_id").GetString().Should().Be(deviceId);
         root.GetProperty("identified_actor_id").GetString().Should().Be("userA");
-        root.GetProperty("source_app").GetString().Should().NotBeNullOrEmpty();
+        root.GetProperty("product").GetString().Should().NotBeNullOrEmpty();
         root.GetProperty("source_version").GetString().Should().Be("2.0.0");
         root.TryGetProperty("identified_at", out _).Should().BeTrue();
 
@@ -442,7 +442,7 @@ public sealed class IdentifyPostTests : IDisposable
         {
             ApiKey = "test-key",
             ApiBaseUrl = _baseUrl,
-            AppName = $"Test_{Guid.NewGuid():N}",
+            Product = $"Test_{Guid.NewGuid():N}",
             AppVersion = "1.0.0",
             Enabled = true,
             FlushIntervalSeconds = 3600
@@ -497,7 +497,7 @@ public sealed class IdentifyPostTests : IDisposable
         {
             ApiKey = "test-key",
             ApiBaseUrl = _baseUrl,
-            AppName = $"Test_{Guid.NewGuid():N}",
+            Product = $"Test_{Guid.NewGuid():N}",
             AppVersion = "1.0.0",
             Enabled = true,
             FlushIntervalSeconds = 3600
@@ -543,7 +543,7 @@ public sealed class IdentifyPostTests : IDisposable
         {
             ApiKey = "test-key",
             ApiBaseUrl = _baseUrl,
-            AppName = $"Test_{Guid.NewGuid():N}",
+            Product = $"Test_{Guid.NewGuid():N}",
             AppVersion = "1.0.0",
             Enabled = true,
             FlushIntervalSeconds = 3600

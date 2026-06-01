@@ -386,7 +386,7 @@ public sealed class AccountLicenseContextTests : IDisposable
         {
             ApiKey = "",
             ApiBaseUrl = "",
-            AppName = "Test",
+            Product = "Test",
             AppVersion = "1.0.0"
         });
 
@@ -406,7 +406,7 @@ public sealed class AccountLicenseContextTests : IDisposable
         {
             ApiKey = "",
             ApiBaseUrl = "",
-            AppName = "Test",
+            Product = "Test",
             AppVersion = "1.0.0"
         });
 

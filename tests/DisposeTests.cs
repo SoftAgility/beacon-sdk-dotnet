@@ -215,7 +215,7 @@ public sealed class DisposeTests
         {
             ApiKey = "test-key",
             ApiBaseUrl = "http://192.0.2.1", // RFC 5737 TEST-NET — non-routable
-            AppName = "TestApp",
+            Product = "TestApp",
             AppVersion = "1.0.0",
             FlushIntervalSeconds = 3600
         });

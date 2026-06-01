@@ -81,13 +81,13 @@ public sealed class AnonymousActorTests : IDisposable
     [Fact]
     public void Init_WithExistingDeviceIdFile_ReloadsDeviceId()
     {
-        // Arrange -- create a tracker, read its device ID, dispose, recreate with same AppName
+        // Arrange -- create a tracker, read its device ID, dispose, recreate with same Product
         var appName = $"AnonTest_{Guid.NewGuid():N}";
         var tracker1 = new BeaconTracker(new BeaconOptions
         {
             ApiKey = "test-api-key",
             ApiBaseUrl = "https://beacon.test.local",
-            AppName = appName,
+            Product = appName,
             AppVersion = "1.0.0",
             Enabled = true,
             FlushIntervalSeconds = 3600
@@ -97,12 +97,12 @@ public sealed class AnonymousActorTests : IDisposable
         var originalDeviceId = File.ReadAllText(Path.Combine(dataDir, "beacon_device_id")).Trim();
         tracker1.Dispose();
 
-        // Act -- create second tracker with same AppName
+        // Act -- create second tracker with same Product
         var tracker2 = new BeaconTracker(new BeaconOptions
         {
             ApiKey = "test-api-key",
             ApiBaseUrl = "https://beacon.test.local",
-            AppName = appName,
+            Product = appName,
             AppVersion = "1.0.0",
             Enabled = true,
             FlushIntervalSeconds = 3600
@@ -227,7 +227,7 @@ public sealed class AnonymousActorTests : IDisposable
         {
             ApiKey = "test-api-key",
             ApiBaseUrl = "https://beacon.test.local",
-            AppName = appName,
+            Product = appName,
             AppVersion = "1.0.0",
             Enabled = true,
             FlushIntervalSeconds = 3600
@@ -244,7 +244,7 @@ public sealed class AnonymousActorTests : IDisposable
         {
             ApiKey = "test-api-key",
             ApiBaseUrl = "https://beacon.test.local",
-            AppName = appName,
+            Product = appName,
             AppVersion = "1.0.0",
             Enabled = true,
             FlushIntervalSeconds = 3600

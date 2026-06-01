@@ -235,7 +235,7 @@ public sealed class EventManifestTests : IDisposable
         {
             ApiKey = "test-key",
             ApiBaseUrl = "https://beacon.example.com",
-            AppName = "MyApp",
+            Product = "MyApp",
             AppVersion = "3.2.1",
             FlushIntervalSeconds = 3600
         };
@@ -258,7 +258,7 @@ public sealed class EventManifestTests : IDisposable
 
         root.GetProperty("schema_version").GetString().Should().Be("1");
         root.GetProperty("generated_at").GetString().Should().NotBeNullOrEmpty();
-        root.GetProperty("source_app").GetString().Should().Be("MyApp");
+        root.GetProperty("product").GetString().Should().Be("MyApp");
         root.GetProperty("source_version").GetString().Should().Be("3.2.1");
 
         var entries = root.GetProperty("entries");
@@ -283,7 +283,7 @@ public sealed class EventManifestTests : IDisposable
         {
             ApiKey = "test-key",
             ApiBaseUrl = "https://beacon.example.com",
-            AppName = "TestApp",
+            Product = "TestApp",
             AppVersion = "1.0.0",
             FlushIntervalSeconds = 3600
         };
@@ -318,7 +318,7 @@ public sealed class EventManifestTests : IDisposable
         {
             ApiKey = "test-key",
             ApiBaseUrl = "https://beacon.example.com",
-            AppName = "DisabledApp",
+            Product = "DisabledApp",
             AppVersion = "1.0.0",
             Enabled = false
         };
@@ -339,7 +339,7 @@ public sealed class EventManifestTests : IDisposable
         var root = doc.RootElement;
 
         root.GetProperty("schema_version").GetString().Should().Be("1");
-        root.GetProperty("source_app").GetString().Should().Be("DisabledApp");
+        root.GetProperty("product").GetString().Should().Be("DisabledApp");
         root.GetProperty("source_version").GetString().Should().Be("1.0.0");
 
         var entries = root.GetProperty("entries");
@@ -362,7 +362,7 @@ public sealed class EventManifestTests : IDisposable
         {
             ApiKey = "test-key",
             ApiBaseUrl = "https://beacon.example.com",
-            AppName = "EmptyApp",
+            Product = "EmptyApp",
             AppVersion = "0.0.1",
             FlushIntervalSeconds = 3600
         };
@@ -379,7 +379,7 @@ public sealed class EventManifestTests : IDisposable
         var root = doc.RootElement;
 
         root.GetProperty("schema_version").GetString().Should().Be("1");
-        root.GetProperty("source_app").GetString().Should().Be("EmptyApp");
+        root.GetProperty("product").GetString().Should().Be("EmptyApp");
         root.GetProperty("source_version").GetString().Should().Be("0.0.1");
 
         var entries = root.GetProperty("entries");
@@ -398,7 +398,7 @@ public sealed class EventManifestTests : IDisposable
         {
             ApiKey = "test-key",
             ApiBaseUrl = "https://beacon.example.com",
-            AppName = "TestApp",
+            Product = "TestApp",
             AppVersion = "1.0.0",
             FlushIntervalSeconds = 3600
         };
@@ -436,7 +436,7 @@ public sealed class EventManifestTests : IDisposable
         {
             ApiKey = "test-key",
             ApiBaseUrl = "https://beacon.example.com",
-            AppName = "TestApp",
+            Product = "TestApp",
             AppVersion = "1.0.0",
             FlushIntervalSeconds = 3600
         };
@@ -459,7 +459,7 @@ public sealed class EventManifestTests : IDisposable
         propertyNames.Should().HaveCount(5);
         propertyNames.Should().Contain("schema_version");
         propertyNames.Should().Contain("generated_at");
-        propertyNames.Should().Contain("source_app");
+        propertyNames.Should().Contain("product");
         propertyNames.Should().Contain("source_version");
         propertyNames.Should().Contain("entries");
 

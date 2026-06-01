@@ -6,6 +6,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-05-31
+
+### Changed
+
+- **BREAKING:** Renamed `BeaconOptions.AppName` → `Product`. The wire field `source_app` is now `product` on events, session starts, exceptions, the actor-identify payload, and the exported event manifest. The value that flows is unchanged (still the registered product slug) — only the field/key name changed. `AppVersion` / `source_version` are unaffected. Consumers must rename `options.AppName = ...` to `options.Product = ...` (and `"AppName"` → `"Product"` in any `appsettings.json` Beacon section) when upgrading.
+
 ## [1.1.0] - 2026-05-26
 
 ### Added

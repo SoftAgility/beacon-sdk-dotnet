@@ -51,7 +51,7 @@ public sealed class BreadcrumbTests : IDisposable
         {
             ApiKey = "test-api-key",
             ApiBaseUrl = _baseUrl,
-            AppName = $"Test_{Guid.NewGuid():N}",
+            Product = $"Test_{Guid.NewGuid():N}",
             AppVersion = "1.0.0",
             Enabled = true,
             FlushIntervalSeconds = 3600,
@@ -389,7 +389,7 @@ public sealed class BreadcrumbTests : IDisposable
         {
             ApiKey = "test-key",
             ApiBaseUrl = "https://beacon.test.local",
-            AppName = $"Test_{Guid.NewGuid():N}",
+            Product = $"Test_{Guid.NewGuid():N}",
             AppVersion = "1.0.0",
             MaxBreadcrumbs = 0,
             FlushIntervalSeconds = 3600

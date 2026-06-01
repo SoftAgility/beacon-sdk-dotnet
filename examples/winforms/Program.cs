@@ -24,7 +24,7 @@ internal static class Program
         // ── Step 2: Configure the Beacon SDK ───────────────────────────
         // BeaconTracker.Configure() creates a singleton instance accessible
         // via BeaconTracker.Instance. If any required field (ApiKey, ApiBaseUrl,
-        // AppName) is missing or empty, the SDK disables itself silently and logs
+        // Product) is missing or empty, the SDK disables itself silently and logs
         // a warning — it does NOT throw. The only exception Configure() throws
         // is InvalidOperationException if called a second time.
         //
@@ -40,7 +40,7 @@ internal static class Program
         {
             options.ApiKey = beaconSection["ApiKey"] ?? string.Empty;
             options.ApiBaseUrl = beaconSection["ApiBaseUrl"] ?? string.Empty;
-            options.AppName = beaconSection["AppName"] ?? string.Empty;
+            options.Product = beaconSection["Product"] ?? string.Empty;
             options.AppVersion = beaconSection["AppVersion"] ?? "0.1.0";
 
             // Optional: customize flush behavior
@@ -71,7 +71,7 @@ internal static class Program
         //   {
         //       options.ApiKey = builder.Configuration["Beacon:ApiKey"]!;
         //       options.ApiBaseUrl = builder.Configuration["Beacon:ApiBaseUrl"]!;
-        //       options.AppName = builder.Configuration["Beacon:AppName"]!;
+        //       options.Product = builder.Configuration["Beacon:Product"]!;
         //       options.AppVersion = builder.Configuration["Beacon:AppVersion"]!;
         //   });
         //

@@ -21,7 +21,7 @@ namespace SoftAgility.Beacon.Tests;
 
 /// <summary>
 /// Tests for runtime consent toggling: OptOut(), OptIn(), and FlushStatus.OptedOut.
-/// Each test uses a unique AppName to isolate data directory side effects.
+/// Each test uses a unique Product to isolate data directory side effects.
 /// </summary>
 public sealed class ConsentOptOutTests : IDisposable
 {
@@ -61,13 +61,13 @@ public sealed class ConsentOptOutTests : IDisposable
     private BeaconTracker CreateTrackerWithOptOutFile()
     {
         // Create a tracker to set up the directory, then dispose it,
-        // plant the opt-out file, and create a new tracker with the same AppName.
+        // plant the opt-out file, and create a new tracker with the same Product.
         var appName = $"ConsentTest_{Guid.NewGuid():N}";
         var tempTracker = new BeaconTracker(new BeaconOptions
         {
             ApiKey = "test-api-key",
             ApiBaseUrl = "https://beacon.test.local",
-            AppName = appName,
+            Product = appName,
             AppVersion = "1.0.0",
             Enabled = true,
             FlushIntervalSeconds = 3600
@@ -78,12 +78,12 @@ public sealed class ConsentOptOutTests : IDisposable
         // Create the sentinel file
         File.Create(Path.Combine(dataDir, "beacon_opted_out")).Dispose();
 
-        // Create a new tracker with the same AppName -- it should read the opt-out file
+        // Create a new tracker with the same Product -- it should read the opt-out file
         var tracker = new BeaconTracker(new BeaconOptions
         {
             ApiKey = "test-api-key",
             ApiBaseUrl = "https://beacon.test.local",
-            AppName = appName,
+            Product = appName,
             AppVersion = "1.0.0",
             Enabled = true,
             FlushIntervalSeconds = 3600
@@ -282,7 +282,7 @@ public sealed class ConsentOptOutTests : IDisposable
         {
             ApiKey = "test-api-key",
             ApiBaseUrl = "https://beacon.test.local",
-            AppName = appName,
+            Product = appName,
             AppVersion = "1.0.0",
             Enabled = true,
             FlushIntervalSeconds = 3600,
@@ -306,7 +306,7 @@ public sealed class ConsentOptOutTests : IDisposable
             File.Exists(manifestPath).Should().BeTrue();
             var content = File.ReadAllText(manifestPath);
             content.Should().Contain("schema_version");
-            content.Should().Contain("source_app");
+            content.Should().Contain("product");
         }
         finally
         {

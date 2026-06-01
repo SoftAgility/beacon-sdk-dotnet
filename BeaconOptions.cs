@@ -19,10 +19,10 @@ public class BeaconOptions
     public string ApiBaseUrl { get; set; } = string.Empty;
 
     /// <summary>
-    /// Application name. Maps to source_app on every event. Required.
+    /// The registered product in Beacon; sent as the <c>product</c> field on every event. Required.
     /// Max 128 characters.
     /// </summary>
-    public string AppName { get; set; } = string.Empty;
+    public string Product { get; set; } = string.Empty;
 
     /// <summary>
     /// Application version. Maps to source_version on every event. Required.

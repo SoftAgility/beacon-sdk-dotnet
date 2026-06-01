@@ -420,7 +420,7 @@ public sealed class HttpClientTests : IDisposable
         var root = doc.RootElement;
         root.GetProperty("session_id").GetString().Should().Be(sessionId);
         root.GetProperty("actor_id").GetString().Should().Be("user-1");
-        root.GetProperty("source_app").GetString().Should().Be("MyApp");
+        root.GetProperty("product").GetString().Should().Be("MyApp");
         root.GetProperty("source_version").GetString().Should().Be("1.0.0");
         root.TryGetProperty("started_at", out _).Should().BeTrue();
     }

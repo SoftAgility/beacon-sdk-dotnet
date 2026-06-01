@@ -59,7 +59,7 @@ public sealed class ExceptionTrackingTests : IDisposable
         {
             ApiKey = "test-api-key",
             ApiBaseUrl = _baseUrl,
-            AppName = $"Test_{Guid.NewGuid():N}",
+            Product = $"Test_{Guid.NewGuid():N}",
             AppVersion = "1.0.0",
             Enabled = enabled,
             FlushIntervalSeconds = flushIntervalSeconds,
@@ -129,7 +129,7 @@ public sealed class ExceptionTrackingTests : IDisposable
         root.GetProperty("actor_id").GetString().Should().Be("user-42");
         root.GetProperty("exception_id").GetString().Should().NotBeNullOrEmpty();
         root.GetProperty("occurred_at").GetString().Should().NotBeNullOrEmpty();
-        root.GetProperty("source_app").GetString().Should().NotBeNullOrEmpty();
+        root.GetProperty("product").GetString().Should().NotBeNullOrEmpty();
         root.GetProperty("source_version").GetString().Should().Be("1.0.0");
         root.GetProperty("message").GetString().Should().Be("Something went wrong");
 
@@ -239,7 +239,7 @@ public sealed class ExceptionTrackingTests : IDisposable
         {
             ApiKey = "test-key",
             ApiBaseUrl = _baseUrl,
-            AppName = "TestApp",
+            Product = "TestApp",
             AppVersion = "1.0.0",
             Enabled = false
         });

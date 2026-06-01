@@ -19,7 +19,7 @@ public sealed class DisabledModeTests : IDisposable
         {
             ApiKey = "test-key",
             ApiBaseUrl = "https://beacon.example.com",
-            AppName = "TestApp",
+            Product = "TestApp",
             AppVersion = "1.0.0",
             Enabled = false
         });

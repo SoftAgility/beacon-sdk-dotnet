@@ -2,7 +2,7 @@
 //   AC-500: Configure() with valid options -> Instance is non-null (FR-439)
 //   AC-502: Missing ApiKey -> SDK disabled, no exception (FR-441, EC-417)
 //   AC-503: Missing ApiBaseUrl -> SDK disabled, no exception (FR-441, EC-417)
-//   AC-504: Missing AppName -> SDK disabled, no exception (FR-441, EC-417)
+//   AC-504: Missing Product -> SDK disabled, no exception (FR-441, EC-417)
 //   AC-505: Invalid URI -> SDK disabled, no exception (EC-418)
 //   AC-540: MaxBatchSize > 1000 -> clamped to 1000 (constraint)
 //   EC-417: Missing required configuration field
@@ -45,7 +45,7 @@ public sealed class ConfigurationTests : IDisposable
         {
             options.ApiKey = "test-api-key";
             options.ApiBaseUrl = "https://beacon.example.com";
-            options.AppName = "TestApp";
+            options.Product = "TestApp";
             options.AppVersion = "1.0.0";
         });
 
@@ -62,7 +62,7 @@ public sealed class ConfigurationTests : IDisposable
         {
             options.ApiKey = "test-api-key";
             options.ApiBaseUrl = "https://beacon.example.com";
-            options.AppName = "TestApp";
+            options.Product = "TestApp";
             options.AppVersion = "1.0.0";
         });
 
@@ -71,7 +71,7 @@ public sealed class ConfigurationTests : IDisposable
         {
             options.ApiKey = "test-api-key-2";
             options.ApiBaseUrl = "https://beacon2.example.com";
-            options.AppName = "TestApp2";
+            options.Product = "TestApp2";
             options.AppVersion = "2.0.0";
         });
 
@@ -89,7 +89,7 @@ public sealed class ConfigurationTests : IDisposable
         {
             options.ApiKey = "";
             options.ApiBaseUrl = "https://beacon.example.com";
-            options.AppName = "TestApp";
+            options.Product = "TestApp";
             options.AppVersion = "1.0.0";
         });
 
@@ -107,7 +107,7 @@ public sealed class ConfigurationTests : IDisposable
         {
             options.ApiKey = null!;
             options.ApiBaseUrl = "https://beacon.example.com";
-            options.AppName = "TestApp";
+            options.Product = "TestApp";
             options.AppVersion = "1.0.0";
         });
 
@@ -125,7 +125,7 @@ public sealed class ConfigurationTests : IDisposable
         {
             options.ApiKey = "test-api-key";
             options.ApiBaseUrl = "";
-            options.AppName = "TestApp";
+            options.Product = "TestApp";
             options.AppVersion = "1.0.0";
         });
 
@@ -134,16 +134,16 @@ public sealed class ConfigurationTests : IDisposable
         BeaconTracker.Instance!.LastFlushStatus.Should().Be(FlushStatus.Disabled);
     }
 
-    // AC-504 / EC-417: Missing AppName -> SDK creates instance but disables itself
+    // AC-504 / EC-417: Missing Product -> SDK creates instance but disables itself
     [Fact]
-    public void Configure_WithEmptyAppName_CreatesDisabledInstance()
+    public void Configure_WithEmptyProduct_CreatesDisabledInstance()
     {
         // Arrange & Act
         BeaconTracker.Configure(options =>
         {
             options.ApiKey = "test-api-key";
             options.ApiBaseUrl = "https://beacon.example.com";
-            options.AppName = "";
+            options.Product = "";
             options.AppVersion = "1.0.0";
         });
 
@@ -161,7 +161,7 @@ public sealed class ConfigurationTests : IDisposable
         {
             options.ApiKey = "test-api-key";
             options.ApiBaseUrl = "myapp";
-            options.AppName = "TestApp";
+            options.Product = "TestApp";
             options.AppVersion = "1.0.0";
         });
 
@@ -179,7 +179,7 @@ public sealed class ConfigurationTests : IDisposable
         {
             options.ApiKey = "test-api-key";
             options.ApiBaseUrl = "beacon.example.com";
-            options.AppName = "TestApp";
+            options.Product = "TestApp";
             options.AppVersion = "1.0.0";
         });
 
@@ -197,7 +197,7 @@ public sealed class ConfigurationTests : IDisposable
         {
             options.ApiKey = "test-api-key";
             options.ApiBaseUrl = "https://beacon.example.com";
-            options.AppName = "TestApp";
+            options.Product = "TestApp";
             options.AppVersion = "1.0.0";
             options.MaxBatchSize = 1001;
         });
@@ -207,9 +207,9 @@ public sealed class ConfigurationTests : IDisposable
         BeaconTracker.Instance.Should().NotBeNull();
     }
 
-    // AppName exceeding 128 chars is truncated
+    // Product exceeding 128 chars is truncated
     [Fact]
-    public void Constructor_WithLongAppName_TruncatesTo128()
+    public void Constructor_WithLongProduct_TruncatesTo128()
     {
         // Arrange
         var longName = new string('a', 200);
@@ -217,7 +217,7 @@ public sealed class ConfigurationTests : IDisposable
         {
             ApiKey = "key",
             ApiBaseUrl = "https://beacon.example.com",
-            AppName = longName,
+            Product = longName,
             AppVersion = "1.0.0",
             FlushIntervalSeconds = 3600
         });
@@ -225,7 +225,7 @@ public sealed class ConfigurationTests : IDisposable
         // Act — track an event and inspect the payload
         tracker.Track("cat", "name", "actor-1");
         var docs = Helpers.TrackerTestHelper.GetQueuedEventDocuments(tracker);
-        var sourceApp = docs[0].RootElement.GetProperty("source_app").GetString()!;
+        var sourceApp = docs[0].RootElement.GetProperty("product").GetString()!;
 
         // Assert
         sourceApp.Length.Should().Be(128);
@@ -243,7 +243,7 @@ public sealed class ConfigurationTests : IDisposable
         {
             ApiKey = "key",
             ApiBaseUrl = "https://beacon.example.com",
-            AppName = "App",
+            Product = "App",
             AppVersion = longVersion,
             FlushIntervalSeconds = 3600
         });
@@ -268,7 +268,7 @@ public sealed class ConfigurationTests : IDisposable
         {
             options.ApiKey = "";
             options.ApiBaseUrl = "https://beacon.example.com";
-            options.AppName = "TestApp";
+            options.Product = "TestApp";
         });
 
         var tracker = BeaconTracker.Instance!;

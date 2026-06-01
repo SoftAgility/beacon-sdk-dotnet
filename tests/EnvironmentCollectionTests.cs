@@ -57,7 +57,7 @@ public sealed class EnvironmentCollectionTests : IDisposable
         {
             ApiKey = "test-key",
             ApiBaseUrl = "https://beacon.test.local",
-            AppName = $"Test_{Guid.NewGuid():N}",
+            Product = $"Test_{Guid.NewGuid():N}",
             AppVersion = "1.0.0",
             FlushIntervalSeconds = 3600
         });
@@ -87,7 +87,7 @@ public sealed class EnvironmentCollectionTests : IDisposable
         {
             ApiKey = "test-key",
             ApiBaseUrl = "https://beacon.test.local",
-            AppName = $"Test_{Guid.NewGuid():N}",
+            Product = $"Test_{Guid.NewGuid():N}",
             AppVersion = "1.0.0",
             Enabled = false,
             FlushIntervalSeconds = 3600
@@ -114,7 +114,7 @@ public sealed class EnvironmentCollectionTests : IDisposable
         {
             ApiKey = "test-key",
             ApiBaseUrl = "https://beacon.test.local",
-            AppName = $"Test_{Guid.NewGuid():N}",
+            Product = $"Test_{Guid.NewGuid():N}",
             AppVersion = "1.0.0",
             FlushIntervalSeconds = 3600
         });
@@ -146,7 +146,7 @@ public sealed class EnvironmentCollectionTests : IDisposable
     {
         // Arrange
         using var client = new BeaconHttpClient(_baseUrl, "test-api-key", null);
-        var payload = """{"exception_id":"test","exception_type":"System.Exception","severity":"fatal","actor_id":"a","occurred_at":"2026-01-01T00:00:00Z","source_app":"app","source_version":"1.0"}""";
+        var payload = """{"exception_id":"test","exception_type":"System.Exception","severity":"fatal","actor_id":"a","occurred_at":"2026-01-01T00:00:00Z","product":"app","source_version":"1.0"}""";
 
         var listenerTask = Task.Run(async () =>
         {
@@ -174,7 +174,7 @@ public sealed class EnvironmentCollectionTests : IDisposable
     {
         // Arrange
         using var client = new BeaconHttpClient(_baseUrl, "bad-key", null);
-        var payload = """{"exception_id":"test","exception_type":"System.Exception","severity":"fatal","actor_id":"a","occurred_at":"2026-01-01T00:00:00Z","source_app":"app","source_version":"1.0"}""";
+        var payload = """{"exception_id":"test","exception_type":"System.Exception","severity":"fatal","actor_id":"a","occurred_at":"2026-01-01T00:00:00Z","product":"app","source_version":"1.0"}""";
 
         var listenerTask = Task.Run(async () =>
         {
