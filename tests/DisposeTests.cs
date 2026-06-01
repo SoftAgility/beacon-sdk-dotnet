@@ -227,8 +227,12 @@ public sealed class DisposeTests
         tracker.Dispose();
         sw.Stop();
 
-        // Assert — should complete in under 1 second (no network calls)
-        sw.ElapsedMilliseconds.Should().BeLessThan(1000,
+        // Assert — Dispose must not perform network I/O. It persists the queue to
+        // disk (SQLite) and joins the background thread — fast, but can take up to a
+        // second or two on a loaded CI runner. The bound stays well under a network
+        // connect timeout to the non-routable TEST-NET address above (20s+), so it
+        // still catches a real network-I/O regression without flaking on disk/thread jitter.
+        sw.ElapsedMilliseconds.Should().BeLessThan(5000,
             "dispose should not perform any network I/O");
     }
 }
