@@ -41,6 +41,23 @@ public sealed class DiskQueueTests : IDisposable
         }
     }
 
+    // Disk-queue contention hardening (busy_timeout): two instances sharing the same
+    // Product (same app as several processes on one host) can coexist on one db file
+    // without erroring. busy_timeout makes a contending writer wait for the lock.
+    [Fact]
+    public void TwoInstances_OnSameFile_BothEnqueueWithoutThrowing()
+    {
+        using var second = new DiskQueue(_dbPath, null);
+
+        var act = () =>
+        {
+            _queue!.Enqueue(["{\"a\":1}"]);
+            second.Enqueue(["{\"b\":2}"]);
+        };
+
+        act.Should().NotThrow();
+    }
+
     // AC-530: Enqueued events can be dequeued in order
     [Fact]
     public void Enqueue_ThenDequeue_ReturnsEventsInOrder()

@@ -31,6 +31,22 @@ internal sealed class DiskQueue : IDisposable
         _connection = new SqliteConnection($"Data Source={dbPath}");
         _connection.Open();
 
+        // Set a busy timeout so that multiple BeaconTracker instances sharing the same
+        // Product on one host (e.g. the same app running as several processes, or a
+        // multi-worker server) degrade gracefully under disk-queue contention: a
+        // contending writer WAITS up to 5s for the lock instead of failing immediately
+        // with SQLITE_BUSY (the default busy_timeout is 0). We deliberately keep the
+        // default rollback journal rather than WAL: WAL would route writes to a side
+        // -wal file, so the main .db file no longer reflects the queue's true size and
+        // the MaxQueueSizeMb cap (which measures the .db file) would stop enforcing.
+        // Off the hot path: Track() is non-blocking (in-memory queue); only the
+        // background flush thread touches the disk queue.
+        using (var pragma = _connection.CreateCommand())
+        {
+            pragma.CommandText = "PRAGMA busy_timeout=5000;";
+            pragma.ExecuteNonQuery();
+        }
+
         InitializeSchema();
     }
 

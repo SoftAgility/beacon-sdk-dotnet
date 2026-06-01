@@ -6,6 +6,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-06-01
+
+### Changed
+
+- **Disk queue hardening (non-breaking).** The SQLite offline queue now sets `PRAGMA busy_timeout=5000`. When multiple `BeaconTracker` instances share the same `Product` on one host — e.g. the same app running as several processes, or a multi-worker server — a contending writer now waits up to 5s for the write lock instead of failing immediately with `SQLITE_BUSY` (the default timeout is 0). The default rollback journal is intentionally kept rather than WAL, so the main `.db` file keeps reflecting the queue's true size for the `MaxQueueSizeMb` cap. Off the user-facing path: `Track()` is non-blocking (in-memory queue); only the background flush thread touches the disk queue.
+
 ## [3.0.0] - 2026-06-01
 
 ### Changed
