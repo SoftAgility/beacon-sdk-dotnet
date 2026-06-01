@@ -384,7 +384,7 @@ public sealed class IdentifyPostTests : IDisposable
             ApiKey = "test-key",
             ApiBaseUrl = _baseUrl,
             Product = $"Test_{Guid.NewGuid():N}",
-            AppVersion = "2.0.0",
+            ProductVersion = "2.0.0",
             Enabled = true,
             FlushIntervalSeconds = 3600
         });
@@ -426,7 +426,7 @@ public sealed class IdentifyPostTests : IDisposable
         root.GetProperty("anonymous_actor_id").GetString().Should().Be(deviceId);
         root.GetProperty("identified_actor_id").GetString().Should().Be("userA");
         root.GetProperty("product").GetString().Should().NotBeNullOrEmpty();
-        root.GetProperty("source_version").GetString().Should().Be("2.0.0");
+        root.GetProperty("product_version").GetString().Should().Be("2.0.0");
         root.TryGetProperty("identified_at", out _).Should().BeTrue();
 
         // Actor ID should be set regardless
@@ -443,7 +443,7 @@ public sealed class IdentifyPostTests : IDisposable
             ApiKey = "test-key",
             ApiBaseUrl = _baseUrl,
             Product = $"Test_{Guid.NewGuid():N}",
-            AppVersion = "1.0.0",
+            ProductVersion = "1.0.0",
             Enabled = true,
             FlushIntervalSeconds = 3600
         });
@@ -498,7 +498,7 @@ public sealed class IdentifyPostTests : IDisposable
             ApiKey = "test-key",
             ApiBaseUrl = _baseUrl,
             Product = $"Test_{Guid.NewGuid():N}",
-            AppVersion = "1.0.0",
+            ProductVersion = "1.0.0",
             Enabled = true,
             FlushIntervalSeconds = 3600
         });
@@ -544,7 +544,7 @@ public sealed class IdentifyPostTests : IDisposable
             ApiKey = "test-key",
             ApiBaseUrl = _baseUrl,
             Product = $"Test_{Guid.NewGuid():N}",
-            AppVersion = "1.0.0",
+            ProductVersion = "1.0.0",
             Enabled = true,
             FlushIntervalSeconds = 3600
         });

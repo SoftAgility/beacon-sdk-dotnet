@@ -22,7 +22,7 @@ public sealed class DiExtensionTests
             options.ApiKey = "test-key";
             options.ApiBaseUrl = "https://beacon.example.com";
             options.Product = "TestApp";
-            options.AppVersion = "1.0.0";
+            options.ProductVersion = "1.0.0";
         });
 
         var provider = services.BuildServiceProvider();
@@ -51,7 +51,7 @@ public sealed class DiExtensionTests
             options.ApiKey = "test-key";
             options.ApiBaseUrl = "https://beacon.example.com";
             options.Product = "TestApp";
-            options.AppVersion = "1.0.0";
+            options.ProductVersion = "1.0.0";
         });
 
         var provider = services.BuildServiceProvider();

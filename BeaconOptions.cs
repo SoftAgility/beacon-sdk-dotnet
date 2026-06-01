@@ -25,10 +25,10 @@ public class BeaconOptions
     public string Product { get; set; } = string.Empty;
 
     /// <summary>
-    /// Application version. Maps to source_version on every event. Required.
+    /// The application version; sent as the <c>product_version</c> field on every event. Required.
     /// Max 256 characters.
     /// </summary>
-    public string AppVersion { get; set; } = string.Empty;
+    public string ProductVersion { get; set; } = string.Empty;
 
     /// <summary>
     /// When false, all SDK methods are silent no-ops. Default: true.

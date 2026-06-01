@@ -29,7 +29,7 @@ services.AddBeacon(options =>
     options.ApiKey      = "pk_your_api_key";
     options.ApiBaseUrl  = "https://api.beacon.softagility.com";
     options.Product     = "MyApp";       // the registered product; sent as the `product` field on every event
-    options.AppVersion  = "1.4.2";       // becomes source_version on every event
+    options.ProductVersion = "1.4.2";    // becomes product_version on every event
 
     // Optional — declare the events your app emits, then export the manifest
     // for upload to the portal's Allowlists > Import page.
@@ -71,7 +71,7 @@ var options = new BeaconOptions
     ApiKey     = "pk_your_api_key",
     ApiBaseUrl = "https://api.beacon.softagility.com",
     Product    = "MyApp",
-    AppVersion = "1.4.2",
+    ProductVersion = "1.4.2",
 };
 
 await using var beacon = new BeaconTracker(options);
@@ -107,7 +107,7 @@ beacon.Track("auth", "user.signed-in");
 | `ApiKey` | required | — | API key from the Beacon portal. Sent as `Authorization: Bearer`. |
 | `ApiBaseUrl` | required | — | Backend base URL. Trailing slash normalised. |
 | `Product` | required | ≤128 chars | The registered product; sent as the `product` field on every event. Must match a registered product in the portal. |
-| `AppVersion` | required | ≤256 chars | Becomes `source_version`. Auto-registers on first event. |
+| `ProductVersion` | required | ≤256 chars | Becomes `product_version`. Auto-registers on first event. |
 | `Enabled` | `true` | — | When false, every public method is a silent no-op. |
 | `FlushIntervalSeconds` | `60` | 1-3600 | Background flush cadence. |
 | `MaxBatchSize` | `25` | 1-1000 | Events per HTTP batch. |

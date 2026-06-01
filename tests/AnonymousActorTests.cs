@@ -88,7 +88,7 @@ public sealed class AnonymousActorTests : IDisposable
             ApiKey = "test-api-key",
             ApiBaseUrl = "https://beacon.test.local",
             Product = appName,
-            AppVersion = "1.0.0",
+            ProductVersion = "1.0.0",
             Enabled = true,
             FlushIntervalSeconds = 3600
         });
@@ -103,7 +103,7 @@ public sealed class AnonymousActorTests : IDisposable
             ApiKey = "test-api-key",
             ApiBaseUrl = "https://beacon.test.local",
             Product = appName,
-            AppVersion = "1.0.0",
+            ProductVersion = "1.0.0",
             Enabled = true,
             FlushIntervalSeconds = 3600
         });
@@ -228,7 +228,7 @@ public sealed class AnonymousActorTests : IDisposable
             ApiKey = "test-api-key",
             ApiBaseUrl = "https://beacon.test.local",
             Product = appName,
-            AppVersion = "1.0.0",
+            ProductVersion = "1.0.0",
             Enabled = true,
             FlushIntervalSeconds = 3600
         });
@@ -245,7 +245,7 @@ public sealed class AnonymousActorTests : IDisposable
             ApiKey = "test-api-key",
             ApiBaseUrl = "https://beacon.test.local",
             Product = appName,
-            AppVersion = "1.0.0",
+            ProductVersion = "1.0.0",
             Enabled = true,
             FlushIntervalSeconds = 3600
         });

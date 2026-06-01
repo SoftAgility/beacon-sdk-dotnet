@@ -60,7 +60,7 @@ public sealed class ExceptionTrackingTests : IDisposable
             ApiKey = "test-api-key",
             ApiBaseUrl = _baseUrl,
             Product = $"Test_{Guid.NewGuid():N}",
-            AppVersion = "1.0.0",
+            ProductVersion = "1.0.0",
             Enabled = enabled,
             FlushIntervalSeconds = flushIntervalSeconds,
             MaxBreadcrumbs = maxBreadcrumbs
@@ -130,7 +130,7 @@ public sealed class ExceptionTrackingTests : IDisposable
         root.GetProperty("exception_id").GetString().Should().NotBeNullOrEmpty();
         root.GetProperty("occurred_at").GetString().Should().NotBeNullOrEmpty();
         root.GetProperty("product").GetString().Should().NotBeNullOrEmpty();
-        root.GetProperty("source_version").GetString().Should().Be("1.0.0");
+        root.GetProperty("product_version").GetString().Should().Be("1.0.0");
         root.GetProperty("message").GetString().Should().Be("Something went wrong");
 
         tracker.Dispose();
@@ -240,7 +240,7 @@ public sealed class ExceptionTrackingTests : IDisposable
             ApiKey = "test-key",
             ApiBaseUrl = _baseUrl,
             Product = "TestApp",
-            AppVersion = "1.0.0",
+            ProductVersion = "1.0.0",
             Enabled = false
         });
 

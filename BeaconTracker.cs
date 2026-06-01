@@ -137,11 +137,11 @@ public sealed class BeaconTracker : IBeaconTracker
         if (_options.MaxBreadcrumbs > 200)
             _options.MaxBreadcrumbs = 200;
 
-        // Truncate Product/AppVersion to documented limits
+        // Truncate Product/ProductVersion to documented limits
         if (_options.Product.Length > 128)
             _options.Product = _options.Product[..128];
-        if (_options.AppVersion.Length > 256)
-            _options.AppVersion = _options.AppVersion[..256];
+        if (_options.ProductVersion.Length > 256)
+            _options.ProductVersion = _options.ProductVersion[..256];
 
         // Build the event definitions list before checking Enabled — ExportEventManifest
         // must work even when the SDK is disabled.
@@ -259,7 +259,7 @@ public sealed class BeaconTracker : IBeaconTracker
                             deviceId,
                             actorId,
                             _options.Product,
-                            _options.AppVersion);
+                            _options.ProductVersion);
                     }
                     catch (Exception ex)
                     {
@@ -361,7 +361,7 @@ public sealed class BeaconTracker : IBeaconTracker
                 ["timestamp"] = DateTimeOffset.UtcNow.ToString("O"),
                 ["actor_id"] = actorId,
                 ["product"] = _options.Product,
-                ["source_version"] = _options.AppVersion
+                ["product_version"] = _options.ProductVersion
             };
 
             if (sessionId is not null)
@@ -487,7 +487,7 @@ public sealed class BeaconTracker : IBeaconTracker
                                 newSessionId,
                                 actorId,
                                 _options.Product,
-                                _options.AppVersion,
+                                _options.ProductVersion,
                                 DateTimeOffset.UtcNow,
                                 sessionAccountId,
                                 sessionLicenseId);
@@ -915,7 +915,7 @@ public sealed class BeaconTracker : IBeaconTracker
             ["occurred_at"] = occurredAt,
             ["actor_id"] = actorId,
             ["product"] = _options.Product,
-            ["source_version"] = _options.AppVersion,
+            ["product_version"] = _options.ProductVersion,
             ["message"] = message,
             ["stack_trace"] = stackTrace,
             ["session_id"] = sessionId
@@ -961,7 +961,7 @@ public sealed class BeaconTracker : IBeaconTracker
             schema_version = "1",
             generated_at = DateTimeOffset.UtcNow.ToString("O"),
             product = _options.Product,
-            source_version = _options.AppVersion,
+            product_version = _options.ProductVersion,
             entries = _definedEvents.Select(e => new
             {
                 category = e.Category,
@@ -1526,9 +1526,9 @@ public sealed class BeaconTracker : IBeaconTracker
             return false;
         }
 
-        if (string.IsNullOrEmpty(options.AppVersion))
+        if (string.IsNullOrEmpty(options.ProductVersion))
         {
-            _logger?.LogWarning("Beacon: AppVersion is missing or empty. SDK disabled.");
+            _logger?.LogWarning("Beacon: ProductVersion is missing or empty. SDK disabled.");
             return false;
         }
 

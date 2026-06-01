@@ -91,7 +91,7 @@ public sealed class BatchingTests : IDisposable
             ApiKey = "test-key",
             ApiBaseUrl = "https://nonexistent.invalid.local",
             Product = "TestApp",
-            AppVersion = "1.0.0",
+            ProductVersion = "1.0.0",
             FlushIntervalSeconds = 3600
         });
 

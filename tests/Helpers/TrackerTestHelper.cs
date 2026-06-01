@@ -19,7 +19,7 @@ internal static class TrackerTestHelper
         string apiKey = "test-api-key",
         string apiBaseUrl = "https://beacon.test.local",
         string? appName = null,
-        string appVersion = "1.0.0",
+        string productVersion = "1.0.0",
         bool enabled = true,
         int maxBatchSize = 1000,
         int flushIntervalSeconds = 3600)
@@ -29,7 +29,7 @@ internal static class TrackerTestHelper
             ApiKey = apiKey,
             ApiBaseUrl = apiBaseUrl,
             Product = appName ?? $"Test_{Guid.NewGuid():N}",
-            AppVersion = appVersion,
+            ProductVersion = productVersion,
             Enabled = enabled,
             MaxBatchSize = maxBatchSize,
             FlushIntervalSeconds = flushIntervalSeconds

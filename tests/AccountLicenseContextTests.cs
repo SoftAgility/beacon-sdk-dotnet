@@ -387,7 +387,7 @@ public sealed class AccountLicenseContextTests : IDisposable
             ApiKey = "",
             ApiBaseUrl = "",
             Product = "Test",
-            AppVersion = "1.0.0"
+            ProductVersion = "1.0.0"
         });
 
         // Act — disabled tracker should silently accept invalid input
@@ -407,7 +407,7 @@ public sealed class AccountLicenseContextTests : IDisposable
             ApiKey = "",
             ApiBaseUrl = "",
             Product = "Test",
-            AppVersion = "1.0.0"
+            ProductVersion = "1.0.0"
         });
 
         var act = () => disabled.SetLicense("");

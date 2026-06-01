@@ -41,7 +41,7 @@ internal static class Program
             options.ApiKey = beaconSection["ApiKey"] ?? string.Empty;
             options.ApiBaseUrl = beaconSection["ApiBaseUrl"] ?? string.Empty;
             options.Product = beaconSection["Product"] ?? string.Empty;
-            options.AppVersion = beaconSection["AppVersion"] ?? "0.1.0";
+            options.ProductVersion = beaconSection["ProductVersion"] ?? "0.1.0";
 
             // Optional: customize flush behavior
             // options.FlushIntervalSeconds = 60;  // Default: 60 seconds
@@ -72,7 +72,7 @@ internal static class Program
         //       options.ApiKey = builder.Configuration["Beacon:ApiKey"]!;
         //       options.ApiBaseUrl = builder.Configuration["Beacon:ApiBaseUrl"]!;
         //       options.Product = builder.Configuration["Beacon:Product"]!;
-        //       options.AppVersion = builder.Configuration["Beacon:AppVersion"]!;
+        //       options.ProductVersion = builder.Configuration["Beacon:ProductVersion"]!;
         //   });
         //
         // Then inject IBeaconTracker into your controllers or services:

@@ -1,6 +1,6 @@
 // Covers:
 //   AC-508: Track queues event with correct fields (FR-443)
-//   AC-509: product/source_version from options (FR-443)
+//   AC-509: product/product_version from options (FR-443)
 //   AC-510: timestamp is current UTC (FR-443)
 //   AC-522: Track includes session_id when session active (FR-449)
 //   AC-544: Each Track() produces distinct event_id (FR-464)
@@ -24,7 +24,7 @@ public sealed class EventTrackingTests : IDisposable
     {
         _tracker = TrackerTestHelper.CreateTracker(
             appName: "MyTestApp",
-            appVersion: "2.5.0");
+            productVersion: "2.5.0");
     }
 
     public void Dispose()
@@ -56,7 +56,7 @@ public sealed class EventTrackingTests : IDisposable
         docs[0].Dispose();
     }
 
-    // AC-509: product and source_version come from BeaconOptions
+    // AC-509: product and product_version come from BeaconOptions
     [Fact]
     public void Track_QueuesEventWithProductAndSourceVersion()
     {
@@ -69,7 +69,7 @@ public sealed class EventTrackingTests : IDisposable
 
         var root = docs[0].RootElement;
         root.GetProperty("product").GetString().Should().Be("MyTestApp");
-        root.GetProperty("source_version").GetString().Should().Be("2.5.0");
+        root.GetProperty("product_version").GetString().Should().Be("2.5.0");
 
         docs[0].Dispose();
     }

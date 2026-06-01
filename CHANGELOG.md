@@ -6,6 +6,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-06-01
+
+### Changed
+
+- **BREAKING:** Renamed `BeaconOptions.AppVersion` → `ProductVersion`. The wire field `source_version` is now `product_version` on events, session starts, exceptions, the actor-identify payload, and the exported event manifest. The value that flows is unchanged (still the application version string) — only the field/key name changed. The `Product` / `product` app-identity field is unaffected. Consumers must rename `options.AppVersion = ...` to `options.ProductVersion = ...` (and `"AppVersion"` → `"ProductVersion"` in any `appsettings.json` Beacon section) when upgrading.
+
 ## [2.0.0] - 2026-05-31
 
 ### Changed

@@ -133,7 +133,7 @@ internal sealed class BeaconHttpClient : IDisposable
                 ["session_id"] = sessionId,
                 ["actor_id"] = actorId,
                 ["product"] = sourceApp,
-                ["source_version"] = sourceVersion,
+                ["product_version"] = sourceVersion,
                 ["started_at"] = startedAt.ToString("O")
             };
 
@@ -279,7 +279,7 @@ internal sealed class BeaconHttpClient : IDisposable
                 IdentifiedActorId = identifiedActorId,
                 IdentifiedAt = DateTimeOffset.UtcNow.ToString("O"),
                 Product = sourceApp,
-                SourceVersion = sourceVersion
+                ProductVersion = sourceVersion
             };
 
             using var request = new HttpRequestMessage(HttpMethod.Post, "v1/actors/identify");

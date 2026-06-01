@@ -236,7 +236,7 @@ public sealed class EventManifestTests : IDisposable
             ApiKey = "test-key",
             ApiBaseUrl = "https://beacon.example.com",
             Product = "MyApp",
-            AppVersion = "3.2.1",
+            ProductVersion = "3.2.1",
             FlushIntervalSeconds = 3600
         };
         options.Events
@@ -259,7 +259,7 @@ public sealed class EventManifestTests : IDisposable
         root.GetProperty("schema_version").GetString().Should().Be("1");
         root.GetProperty("generated_at").GetString().Should().NotBeNullOrEmpty();
         root.GetProperty("product").GetString().Should().Be("MyApp");
-        root.GetProperty("source_version").GetString().Should().Be("3.2.1");
+        root.GetProperty("product_version").GetString().Should().Be("3.2.1");
 
         var entries = root.GetProperty("entries");
         entries.GetArrayLength().Should().Be(2);
@@ -284,7 +284,7 @@ public sealed class EventManifestTests : IDisposable
             ApiKey = "test-key",
             ApiBaseUrl = "https://beacon.example.com",
             Product = "TestApp",
-            AppVersion = "1.0.0",
+            ProductVersion = "1.0.0",
             FlushIntervalSeconds = 3600
         };
         options.Events.Define("test", "event");
@@ -319,7 +319,7 @@ public sealed class EventManifestTests : IDisposable
             ApiKey = "test-key",
             ApiBaseUrl = "https://beacon.example.com",
             Product = "DisabledApp",
-            AppVersion = "1.0.0",
+            ProductVersion = "1.0.0",
             Enabled = false
         };
         options.Events
@@ -340,7 +340,7 @@ public sealed class EventManifestTests : IDisposable
 
         root.GetProperty("schema_version").GetString().Should().Be("1");
         root.GetProperty("product").GetString().Should().Be("DisabledApp");
-        root.GetProperty("source_version").GetString().Should().Be("1.0.0");
+        root.GetProperty("product_version").GetString().Should().Be("1.0.0");
 
         var entries = root.GetProperty("entries");
         entries.GetArrayLength().Should().Be(2);
@@ -363,7 +363,7 @@ public sealed class EventManifestTests : IDisposable
             ApiKey = "test-key",
             ApiBaseUrl = "https://beacon.example.com",
             Product = "EmptyApp",
-            AppVersion = "0.0.1",
+            ProductVersion = "0.0.1",
             FlushIntervalSeconds = 3600
         };
         // No events defined on options.Events
@@ -380,7 +380,7 @@ public sealed class EventManifestTests : IDisposable
 
         root.GetProperty("schema_version").GetString().Should().Be("1");
         root.GetProperty("product").GetString().Should().Be("EmptyApp");
-        root.GetProperty("source_version").GetString().Should().Be("0.0.1");
+        root.GetProperty("product_version").GetString().Should().Be("0.0.1");
 
         var entries = root.GetProperty("entries");
         entries.GetArrayLength().Should().Be(0, "entries array should be empty when no events are defined");
@@ -399,7 +399,7 @@ public sealed class EventManifestTests : IDisposable
             ApiKey = "test-key",
             ApiBaseUrl = "https://beacon.example.com",
             Product = "TestApp",
-            AppVersion = "1.0.0",
+            ProductVersion = "1.0.0",
             FlushIntervalSeconds = 3600
         };
         options.Events.Define("feature", "click");
@@ -437,7 +437,7 @@ public sealed class EventManifestTests : IDisposable
             ApiKey = "test-key",
             ApiBaseUrl = "https://beacon.example.com",
             Product = "TestApp",
-            AppVersion = "1.0.0",
+            ProductVersion = "1.0.0",
             FlushIntervalSeconds = 3600
         };
         options.Events.Define("test", "event");
@@ -460,7 +460,7 @@ public sealed class EventManifestTests : IDisposable
         propertyNames.Should().Contain("schema_version");
         propertyNames.Should().Contain("generated_at");
         propertyNames.Should().Contain("product");
-        propertyNames.Should().Contain("source_version");
+        propertyNames.Should().Contain("product_version");
         propertyNames.Should().Contain("entries");
 
         doc.Dispose();

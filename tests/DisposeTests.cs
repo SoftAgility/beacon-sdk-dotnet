@@ -216,7 +216,7 @@ public sealed class DisposeTests
             ApiKey = "test-key",
             ApiBaseUrl = "http://192.0.2.1", // RFC 5737 TEST-NET — non-routable
             Product = "TestApp",
-            AppVersion = "1.0.0",
+            ProductVersion = "1.0.0",
             FlushIntervalSeconds = 3600
         });
         tracker.Track("test", "event", "actor-1");

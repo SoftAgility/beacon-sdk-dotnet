@@ -52,7 +52,7 @@ public sealed class BreadcrumbTests : IDisposable
             ApiKey = "test-api-key",
             ApiBaseUrl = _baseUrl,
             Product = $"Test_{Guid.NewGuid():N}",
-            AppVersion = "1.0.0",
+            ProductVersion = "1.0.0",
             Enabled = true,
             FlushIntervalSeconds = 3600,
             MaxBreadcrumbs = maxBreadcrumbs,
@@ -390,7 +390,7 @@ public sealed class BreadcrumbTests : IDisposable
             ApiKey = "test-key",
             ApiBaseUrl = "https://beacon.test.local",
             Product = $"Test_{Guid.NewGuid():N}",
-            AppVersion = "1.0.0",
+            ProductVersion = "1.0.0",
             MaxBreadcrumbs = 0,
             FlushIntervalSeconds = 3600
         });

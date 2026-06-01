@@ -46,7 +46,7 @@ public sealed class ConfigurationTests : IDisposable
             options.ApiKey = "test-api-key";
             options.ApiBaseUrl = "https://beacon.example.com";
             options.Product = "TestApp";
-            options.AppVersion = "1.0.0";
+            options.ProductVersion = "1.0.0";
         });
 
         // Assert
@@ -63,7 +63,7 @@ public sealed class ConfigurationTests : IDisposable
             options.ApiKey = "test-api-key";
             options.ApiBaseUrl = "https://beacon.example.com";
             options.Product = "TestApp";
-            options.AppVersion = "1.0.0";
+            options.ProductVersion = "1.0.0";
         });
 
         // Act
@@ -72,7 +72,7 @@ public sealed class ConfigurationTests : IDisposable
             options.ApiKey = "test-api-key-2";
             options.ApiBaseUrl = "https://beacon2.example.com";
             options.Product = "TestApp2";
-            options.AppVersion = "2.0.0";
+            options.ProductVersion = "2.0.0";
         });
 
         // Assert
@@ -90,7 +90,7 @@ public sealed class ConfigurationTests : IDisposable
             options.ApiKey = "";
             options.ApiBaseUrl = "https://beacon.example.com";
             options.Product = "TestApp";
-            options.AppVersion = "1.0.0";
+            options.ProductVersion = "1.0.0";
         });
 
         // Assert — instance exists but is disabled (all calls are no-ops)
@@ -108,7 +108,7 @@ public sealed class ConfigurationTests : IDisposable
             options.ApiKey = null!;
             options.ApiBaseUrl = "https://beacon.example.com";
             options.Product = "TestApp";
-            options.AppVersion = "1.0.0";
+            options.ProductVersion = "1.0.0";
         });
 
         // Assert
@@ -126,7 +126,7 @@ public sealed class ConfigurationTests : IDisposable
             options.ApiKey = "test-api-key";
             options.ApiBaseUrl = "";
             options.Product = "TestApp";
-            options.AppVersion = "1.0.0";
+            options.ProductVersion = "1.0.0";
         });
 
         // Assert
@@ -144,7 +144,7 @@ public sealed class ConfigurationTests : IDisposable
             options.ApiKey = "test-api-key";
             options.ApiBaseUrl = "https://beacon.example.com";
             options.Product = "";
-            options.AppVersion = "1.0.0";
+            options.ProductVersion = "1.0.0";
         });
 
         // Assert
@@ -162,7 +162,7 @@ public sealed class ConfigurationTests : IDisposable
             options.ApiKey = "test-api-key";
             options.ApiBaseUrl = "myapp";
             options.Product = "TestApp";
-            options.AppVersion = "1.0.0";
+            options.ProductVersion = "1.0.0";
         });
 
         // Assert
@@ -180,7 +180,7 @@ public sealed class ConfigurationTests : IDisposable
             options.ApiKey = "test-api-key";
             options.ApiBaseUrl = "beacon.example.com";
             options.Product = "TestApp";
-            options.AppVersion = "1.0.0";
+            options.ProductVersion = "1.0.0";
         });
 
         // Assert
@@ -198,7 +198,7 @@ public sealed class ConfigurationTests : IDisposable
             options.ApiKey = "test-api-key";
             options.ApiBaseUrl = "https://beacon.example.com";
             options.Product = "TestApp";
-            options.AppVersion = "1.0.0";
+            options.ProductVersion = "1.0.0";
             options.MaxBatchSize = 1001;
         });
 
@@ -218,7 +218,7 @@ public sealed class ConfigurationTests : IDisposable
             ApiKey = "key",
             ApiBaseUrl = "https://beacon.example.com",
             Product = longName,
-            AppVersion = "1.0.0",
+            ProductVersion = "1.0.0",
             FlushIntervalSeconds = 3600
         });
 
@@ -233,9 +233,9 @@ public sealed class ConfigurationTests : IDisposable
         tracker.Dispose();
     }
 
-    // AppVersion exceeding 256 chars is truncated
+    // ProductVersion exceeding 256 chars is truncated
     [Fact]
-    public void Constructor_WithLongAppVersion_TruncatesTo256()
+    public void Constructor_WithLongProductVersion_TruncatesTo256()
     {
         // Arrange
         var longVersion = new string('v', 300);
@@ -244,14 +244,14 @@ public sealed class ConfigurationTests : IDisposable
             ApiKey = "key",
             ApiBaseUrl = "https://beacon.example.com",
             Product = "App",
-            AppVersion = longVersion,
+            ProductVersion = longVersion,
             FlushIntervalSeconds = 3600
         });
 
         // Act
         tracker.Track("cat", "name", "actor-1");
         var docs = Helpers.TrackerTestHelper.GetQueuedEventDocuments(tracker);
-        var sourceVersion = docs[0].RootElement.GetProperty("source_version").GetString()!;
+        var sourceVersion = docs[0].RootElement.GetProperty("product_version").GetString()!;
 
         // Assert
         sourceVersion.Length.Should().Be(256);
