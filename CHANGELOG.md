@@ -6,6 +6,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [3.2.1] - 2026-06-02
+
+### Changed
+
+- **Docs:** README now documents the full target-framework matrix introduced in 3.2.0 (.NET Framework 4.8 / .NET Standard 2.0 / .NET 6+). No code change — the 3.2.0 and 3.2.1 binaries are identical; this release exists only to surface the corrected README on NuGet (the README is embedded in the package, and 3.2.0 shipped with the old `.NET 8` text).
+
+## [3.2.0] - 2026-06-02
+
+### Added
+
+- **Broadened target frameworks (non-breaking).** The package now multi-targets `net8.0;net8.0-windows;net6.0;netstandard2.0;net48`, so it can be referenced from **.NET Framework 4.8**, **.NET Standard 2.0**, **.NET 6/7**, and modern **.NET 8/9/10** — in addition to the previous `net8.0`/`net8.0-windows`. No public-API or wire-format change; existing .NET 8 consumers are unaffected. Down-level targets use internal compatibility shims (System.Text.Json 8.0 for `SnakeCaseLower`, PolySharp for `Index`/`Range`/`init`, `Microsoft.Bcl.AsyncInterfaces`, `System.Memory`). Verified on all five TFMs; .NET Framework SQLite native loading proven via net48/net472 consumer smoke tests.
+
 ## [3.1.0] - 2026-06-01
 
 ### Changed

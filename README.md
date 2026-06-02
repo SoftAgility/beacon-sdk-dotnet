@@ -13,7 +13,7 @@ The official .NET SDK for [SoftAgility Beacon](https://beacon.softagility.com) �
 dotnet add package SoftAgility.Beacon
 ```
 
-Targets `.NET 8` (any platform) plus a separate `.NET 8` Windows-Forms target. The base library has no UI dependency; the WinForms target adds optional helpers for desktop apps.
+Runs almost anywhere: the package multi-targets **.NET 6/7/8/9/10**, **.NET Framework 4.8**, and **.NET Standard 2.0** (with a Windows-specific target for WinForms desktop apps). Whether you ship a legacy WinForms app on the .NET Framework or a modern .NET 10 service, the integration is identical and the wire format is the same.
 
 ---
 
@@ -120,10 +120,15 @@ beacon.Track("auth", "user.signed-in");
 
 ## Compatibility
 
-- **.NET 8** (`net8.0`) — the base library, runs anywhere
-- **.NET 8 Windows** (`net8.0-windows`) — same library plus `UseWindowsForms = true`, useful for WinForms apps that want the WinForms-friendly target without a separate dependency
+As of **3.2.0**, the package ships five target frameworks:
 
-NuGet's automatic best-match resolution picks the right TFM at install time. No manual selection needed.
+- **`net8.0`** — base library; consumed by .NET 8, 9, and 10 (any platform)
+- **`net8.0-windows`** — same library with `UseWindowsForms = true`, for WinForms desktop apps on modern .NET
+- **`net6.0`** — for .NET 6 and 7 apps
+- **`netstandard2.0`** — for .NET Standard 2.0 consumers (older .NET Core, Mono, Unity, mixed legacy libraries)
+- **`net48`** — for **.NET Framework 4.8** apps (WinForms/WPF/console on the classic framework)
+
+NuGet's automatic best-match resolution picks the right TFM at install time — no manual selection needed. (3.0.0–3.1.0 shipped `net8.0`/`net8.0-windows` only; **3.2.0** broadened the matrix with no public-API or wire-format change.)
 
 ---
 

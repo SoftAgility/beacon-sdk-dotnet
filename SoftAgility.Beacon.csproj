@@ -16,7 +16,7 @@
 
     <!-- NuGet Package Metadata -->
     <PackageId>SoftAgility.Beacon</PackageId>
-    <Version>3.2.0</Version>
+    <Version>3.2.1</Version>
     <Authors>SoftAgility</Authors>
     <Company>SoftAgility</Company>
     <Copyright>Copyright (c) 2026 SoftAgility</Copyright>
