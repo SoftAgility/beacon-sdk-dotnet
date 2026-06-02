@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to publish (e.g. 1.0.0). If empty, uses tag name.'
+        description: 'Version to publish (e.g. 3.2.0). If empty, uses tag name.'
         required: false
         default: ''
 
@@ -16,23 +16,25 @@ permissions:
 jobs:
   publish:
     name: Pack + push SoftAgility.Beacon
-    runs-on: ubuntu-latest
+    # Windows is required: the SDK multi-targets net48 and net8.0-windows, which
+    # only build (and net48 only tests) on Windows.
+    runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           # SourceLink embeds correct git commit info — needs full history
           fetch-depth: 0
 
-      - name: Set up .NET (SDK + tests)
-        uses: actions/setup-dotnet@v4
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
         with:
-          # SDK targets net8.0 / net8.0-windows; tests target net10.0
           dotnet-version: |
             8.0.x
             10.0.x
 
       - name: Determine version
         id: version
+        shell: bash
         run: |
           if [ -n "${{ inputs.version }}" ]; then
             VERSION="${{ inputs.version }}"
@@ -42,37 +44,37 @@ jobs:
           echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Publishing version: $VERSION"
 
-      - name: Restore
-        run: dotnet restore
+      # Build gate — all five TFMs must compile before we run tests / publish.
+      - name: Build library (all 5 TFMs)
+        run: dotnet build SoftAgility.Beacon.csproj -c Release
 
-      - name: Build
-        run: dotnet build -c Release --no-restore -p:Version=${{ steps.version.outputs.VERSION }}
+      # Release quality gate: full suite on each runnable TFM.
+      - name: Test (net8.0)
+        run: dotnet test tests/SoftAgility.Beacon.Tests.csproj -c Release -f net8.0 --logger "console;verbosity=normal"
 
-      - name: Test
-        run: dotnet test -c Release --no-build --logger "console;verbosity=detailed"
+      - name: Test (net6.0 — rolls forward to net8 runtime)
+        run: dotnet test tests/SoftAgility.Beacon.Tests.csproj -c Release -f net6.0 --logger "console;verbosity=normal"
 
+      - name: Test (net48 — .NET Framework testhost, AppDomain disabled for native SQLite)
+        run: dotnet test tests/SoftAgility.Beacon.Tests.csproj -c Release -f net48 --settings tests/net48.runsettings --logger "console;verbosity=normal"
+
+      # Pack with a fresh versioned build so the package version is authoritative
+      # regardless of intermediate test builds.
       - name: Pack
-        run: |
-          dotnet pack SoftAgility.Beacon.csproj \
-            -c Release \
-            --no-build \
-            -p:Version=${{ steps.version.outputs.VERSION }} \
-            -o ./artifacts
+        run: dotnet pack SoftAgility.Beacon.csproj -c Release -p:Version=${{ steps.version.outputs.VERSION }} -o ./artifacts
 
       - name: Inspect package contents
+        shell: pwsh
         run: |
-          ls -la ./artifacts
-          echo "--- main package ---"
-          unzip -l ./artifacts/SoftAgility.Beacon.${{ steps.version.outputs.VERSION }}.nupkg
-          echo "--- symbol package ---"
-          unzip -l ./artifacts/SoftAgility.Beacon.${{ steps.version.outputs.VERSION }}.snupkg
+          Get-ChildItem ./artifacts
+          $nupkg = "./artifacts/SoftAgility.Beacon.${{ steps.version.outputs.VERSION }}.nupkg"
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          Write-Host "--- lib/ assets in package ---"
+          [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path $nupkg)).Entries.FullName |
+            Where-Object { $_ -like 'lib/*' } | Sort-Object
 
       - name: Push to NuGet
-        run: |
-          dotnet nuget push artifacts/SoftAgility.Beacon.${{ steps.version.outputs.VERSION }}.nupkg \
-            --api-key ${{ secrets.NUGET_API_KEY }} \
-            --source https://api.nuget.org/v3/index.json \
-            --skip-duplicate
+        # dotnet nuget push auto-pushes the matching .snupkg in the same directory
+        run: dotnet nuget push artifacts/SoftAgility.Beacon.${{ steps.version.outputs.VERSION }}.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
         env:
-          # dotnet nuget push auto-pushes the matching .snupkg in the same directory
           DOTNET_NOLOGO: 'true'
