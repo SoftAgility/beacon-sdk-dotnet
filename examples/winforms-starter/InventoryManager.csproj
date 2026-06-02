@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>InventoryManager</RootNamespace>
+    <AssemblyName>InventoryManager</AssemblyName>
+  </PropertyGroup>
+
+  <!--
+    This is the UN-INSTRUMENTED starter. It deliberately has NO reference to
+    SoftAgility.Beacon. You add that yourself in Step 1 of the tutorial:
+
+        dotnet add package SoftAgility.Beacon
+  -->
+
+</Project>
