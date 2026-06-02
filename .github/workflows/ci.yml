@@ -10,15 +10,12 @@ permissions:
   contents: read
 
 jobs:
-  build-and-test:
-    name: Build + test
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        # Test on both Linux (the publish runner) and Windows (since the SDK has a
-        # net8.0-windows target and a WinForms example in the consumer ecosystem).
-        os: [ubuntu-latest, windows-latest]
+  # Authoritative job: build + test + pack across ALL five target frameworks.
+  # Requires Windows — net48 and net8.0-windows can only build/test on Windows,
+  # and the net48 test run needs the .NET Framework testhost.
+  windows:
+    name: Windows — all TFMs
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -29,22 +26,63 @@ jobs:
             8.0.x
             10.0.x
 
-      - name: Restore
-        run: dotnet restore
+      # Builds net8.0, net8.0-windows, net6.0, netstandard2.0, and net48.
+      # windows-latest ships the .NET Framework 4.8 targeting pack + the
+      # Windows Desktop SDK, so all five compile here.
+      - name: Build library (all 5 TFMs)
+        run: dotnet build SoftAgility.Beacon.csproj -c Release
 
-      - name: Build
-        run: dotnet build -c Release --no-restore
+      - name: Test (net8.0)
+        run: dotnet test tests/SoftAgility.Beacon.Tests.csproj -c Release -f net8.0 --logger "console;verbosity=normal"
 
-      - name: Test
-        run: dotnet test -c Release --no-build --logger "console;verbosity=normal"
+      # net6.0 has no installed runtime on the runner; the test project sets
+      # <RollForward>LatestMajor</RollForward>, so the net6.0-compiled assembly
+      # runs on the net8 runtime. The net6 #else branches are compiled in, so
+      # this still validates them (RG-6 CancelAsync path).
+      - name: Test (net6.0 — rolls forward to net8 runtime)
+        run: dotnet test tests/SoftAgility.Beacon.Tests.csproj -c Release -f net6.0 --logger "console;verbosity=normal"
 
-      - name: Pack (verify packaging works without actually publishing)
+      # net48 MUST use the runsettings: the .NET Framework VSTest host
+      # shadow-copies the assembly and drops the SQLitePCLRaw native
+      # e_sqlite3.dll; DisableAppDomain runs it in place so the native lib loads.
+      - name: Test (net48 — .NET Framework testhost, AppDomain disabled for native SQLite)
+        run: dotnet test tests/SoftAgility.Beacon.Tests.csproj -c Release -f net48 --settings tests/net48.runsettings --logger "console;verbosity=normal"
+
+      - name: Pack (verify all 5 lib assets without publishing)
         run: dotnet pack SoftAgility.Beacon.csproj -c Release --no-build -o ./artifacts
 
-      - name: Upload package artifact (Linux only — same on both platforms)
-        if: matrix.os == 'ubuntu-latest'
+      - name: Upload package artifact
         uses: actions/upload-artifact@v4
         with:
           name: nupkg
           path: ./artifacts/*.*nupkg
           retention-days: 7
+
+  # Cross-platform guard: ensure the portable TFMs still build on Linux (where
+  # many consumers' CI runs). net48 and net8.0-windows are Windows-only and are
+  # intentionally excluded here.
+  linux-portable:
+    name: Linux — portable TFMs
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        tfm: [net8.0, net6.0, netstandard2.0]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Build library (${{ matrix.tfm }})
+        run: dotnet build SoftAgility.Beacon.csproj -c Release -f ${{ matrix.tfm }}
+
+      # Only net8.0 has a runtime reliably present on the Linux runner; run the
+      # suite there as the cross-platform behavioral guard.
+      - name: Test (net8.0)
+        if: matrix.tfm == 'net8.0'
+        run: dotnet test tests/SoftAgility.Beacon.Tests.csproj -c Release -f net8.0 --logger "console;verbosity=normal"
