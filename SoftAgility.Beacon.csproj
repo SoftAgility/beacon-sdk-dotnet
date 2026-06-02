@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net8.0;net8.0-windows</TargetFrameworks>
+    <TargetFrameworks>net8.0;net8.0-windows;net6.0;netstandard2.0;net48</TargetFrameworks>
+    <LangVersion>12</LangVersion>
     <UseWindowsForms Condition="'$(TargetFramework)' == 'net8.0-windows'">true</UseWindowsForms>
     <!-- Allow Linux + macOS CI runners to cross-compile the net8.0-windows target.
          The produced binaries only run on Windows, but they pack correctly into the
@@ -15,7 +16,7 @@
 
     <!-- NuGet Package Metadata -->
     <PackageId>SoftAgility.Beacon</PackageId>
-    <Version>3.1.0</Version>
+    <Version>3.2.0</Version>
     <Authors>SoftAgility</Authors>
     <Company>SoftAgility</Company>
     <Copyright>Copyright (c) 2026 SoftAgility</Copyright>
@@ -39,6 +40,35 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="SoftAgility.Beacon.Tests" />
+  </ItemGroup>
+
+  <!-- net48: the WINDOWS define is what lights up the screen-dimension branch
+       (EnvironmentCollector.cs); the System.Windows.Forms reference is what makes
+       it compile. UseWindowsForms is a .NET-Core+ concept, so on .NET Framework
+       we reference the assembly directly rather than setting UseWindowsForms. -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net48'">
+    <DefineConstants>$(DefineConstants);WINDOWS</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
+    <Reference Include="System.Windows.Forms" />
+    <!-- .NET Framework does not auto-reference System.Net.Http; HttpClient /
+         HttpResponseMessage / HttpContent live there. (netstandard2.0 surfaces
+         these via the in-box facade, so this is net48-only.) -->
+    <Reference Include="System.Net.Http" />
+  </ItemGroup>
+
+  <!-- Down-level-only package references.
+       System.Text.Json 8.0.* brings JsonNamingPolicy.SnakeCaseLower (R1) to the
+       TFMs whose in-box STJ predates it (net6.0/netstandard2.0/net48). -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'net48' or '$(TargetFramework)' == 'net6.0'">
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+  </ItemGroup>
+  <!-- netstandard2.0/net48 polyfills: async-dispose interfaces (R5), Span/Memory
+       (R6), and source-only Index/Range + IsExternalInit (R3/R4) via PolySharp. -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'net48'">
+    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="8.0.0" />
+    <PackageReference Include="System.Memory" Version="4.5.5" />
+    <PackageReference Include="PolySharp" Version="1.14.1" PrivateAssets="all" />
   </ItemGroup>
 
   <!-- Files included in the NuGet package -->

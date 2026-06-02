@@ -1,3 +1,5 @@
+using SoftAgility.Beacon.Internal.Compat;
+
 namespace SoftAgility.Beacon;
 
 /// <summary>
@@ -12,8 +14,8 @@ public sealed class EventDefinitionBuilder
 
     public EventDefinitionBuilder Define(string category, string name)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(category);
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        Guard.NotNullOrWhiteSpace(category);
+        Guard.NotNullOrWhiteSpace(name);
         _events.Add((category, name));
         return this;
     }

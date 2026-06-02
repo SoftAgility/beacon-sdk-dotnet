@@ -295,7 +295,11 @@ public sealed class BeaconTracker : IBeaconTracker
             }
             else if (!string.IsNullOrEmpty(_deviceId))
             {
-                actorId = _deviceId;
+                // _deviceId is non-null here (guarded by !IsNullOrEmpty). The
+                // null-forgiving operator is required down-level because the
+                // netstandard2.0/net48 reference assemblies lack the
+                // [NotNullWhen] attribute on string.IsNullOrEmpty.
+                actorId = _deviceId!;
             }
             else
             {
@@ -425,7 +429,11 @@ public sealed class BeaconTracker : IBeaconTracker
             }
             else if (!string.IsNullOrEmpty(_deviceId))
             {
-                actorId = _deviceId;
+                // _deviceId is non-null here (guarded by !IsNullOrEmpty). The
+                // null-forgiving operator is required down-level because the
+                // netstandard2.0/net48 reference assemblies lack the
+                // [NotNullWhen] attribute on string.IsNullOrEmpty.
+                actorId = _deviceId!;
             }
             else
             {
@@ -827,7 +835,9 @@ public sealed class BeaconTracker : IBeaconTracker
         {
             if (!string.IsNullOrEmpty(_deviceId))
             {
-                actorId = _deviceId;
+                // _deviceId is non-null here (guarded by !IsNullOrEmpty). See the
+                // null-forgiving rationale above for the down-level reference assemblies.
+                actorId = _deviceId!;
             }
             else
             {
@@ -1013,13 +1023,30 @@ public sealed class BeaconTracker : IBeaconTracker
             // see the flag and become no-ops before we drain the memory queue.
             _disposed = true;
 
-            // Cancel any in-flight timer-driven flushes so they release the semaphore
+            // Cancel any in-flight timer-driven flushes so they release the semaphore.
+            // CancellationTokenSource.CancelAsync() was added in .NET 8 (it breaks net6
+            // too), so guard on NET8_0_OR_GREATER and fall back to synchronous Cancel(). (R11a)
+#if NET8_0_OR_GREATER
             await _shutdownCts.CancelAsync();
+#else
+            _shutdownCts.Cancel();
+#endif
 
-            // Stop the timer
+            // Stop the timer. Timer.DisposeAsync() was added in .NET Core 3.0; down-level
+            // we use Dispose(WaitHandle) + WaitOne() to preserve the "wait until outstanding
+            // timer callbacks complete" semantics that DisposeAsync provides — NOT a bare
+            // Dispose(), which does not wait. (R11b)
             if (_flushTimer is not null)
             {
+#if NET6_0_OR_GREATER
                 await _flushTimer.DisposeAsync();
+#else
+                using var disposalWaitHandle = new ManualResetEvent(false);
+                if (_flushTimer.Dispose(disposalWaitHandle))
+                {
+                    disposalWaitHandle.WaitOne();
+                }
+#endif
             }
 
             if (_options.Enabled)

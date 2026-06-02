@@ -4,11 +4,11 @@
 //   AC-543: machine_name_hash is SHA256 hex of Environment.MachineName (FR-463)
 //   ED-426: Non-Windows platform — display dimensions omitted
 
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using FluentAssertions;
 using SoftAgility.Beacon.Internal;
+using SoftAgility.Beacon.Tests.Helpers;
 
 namespace SoftAgility.Beacon.Tests;
 
@@ -106,31 +106,43 @@ public sealed class EnvironmentCollectorTests
         validBuckets.Should().Contain(bucket);
     }
 
-    // AC-541 / ED-426: On net8.0 (non-Windows TFM), display dimensions should be omitted.
-    // Since the test project targets net8.0 (not net8.0-windows), the WINDOWS
-    // preprocessor symbol is not defined, so display_width/display_height should be absent.
+    // AC-541 / ED-426: display dimensions are present iff the SDK build defines WINDOWS.
+    // The test references the SDK via ProjectReference, so each test TFM resolves the
+    // matching SDK TFM: net8.0 (no WINDOWS) → dims omitted; net48 (WINDOWS defined in
+    // the SDK csproj) → dims present. The assertion is therefore TFM-gated on the same
+    // WINDOWS symbol the SDK uses, keeping the original net8 intent while staying green
+    // on the net48 down-level run (RG-3 cross-check).
     [Fact]
-    public void CollectJson_OnNonWindowsTfm_OmitsDisplayDimensions()
+    public void CollectJson_DisplayDimensions_TrackTheWindowsBuild()
     {
         // Act
         var json = EnvironmentCollector.CollectJson();
         using var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
 
-        // Assert
-        // The test project targets net8.0 (not net8.0-windows), so the #if WINDOWS
-        // block in EnvironmentCollector won't execute. display_width and display_height
-        // should be null and therefore omitted (JsonIgnoreCondition.WhenWritingNull).
+#if WINDOWS
+        // On a WINDOWS-defined SDK build (net48 test run resolves lib/net48), the
+        // #if WINDOWS branch in EnvironmentCollector runs and enriches display dims.
+        root.TryGetProperty("display_width", out _).Should().BeTrue(
+            "display_width should be present on a WINDOWS SDK build (net48)");
+        root.TryGetProperty("display_height", out _).Should().BeTrue(
+            "display_height should be present on a WINDOWS SDK build (net48)");
+#else
+        // The test project targets net8.0/net6.0 (not -windows), so WINDOWS is not
+        // defined in the resolved SDK build and the dims are null → omitted via
+        // JsonIgnoreCondition.WhenWritingNull.
         root.TryGetProperty("display_width", out _).Should().BeFalse(
-            "display_width should be omitted on non-Windows TFM (net8.0)");
+            "display_width should be omitted on a non-WINDOWS TFM (net8.0/net6.0)");
         root.TryGetProperty("display_height", out _).Should().BeFalse(
-            "display_height should be omitted on non-Windows TFM (net8.0)");
+            "display_height should be omitted on a non-WINDOWS TFM (net8.0/net6.0)");
+#endif
     }
 
     private static string ComputeExpectedHash(string machineName)
     {
         var nameBytes = Encoding.UTF8.GetBytes(machineName);
-        var hashBytes = SHA256.HashData(nameBytes);
-        return Convert.ToHexString(hashBytes).ToLowerInvariant();
+        // Down-level-safe: instance SHA256 + manual lowercase hex (the static
+        // SHA256.HashData / Convert.ToHexString are .NET 5+ and absent on net48).
+        return CompatTestHelpers.Sha256LowerHex(nameBytes);
     }
 }

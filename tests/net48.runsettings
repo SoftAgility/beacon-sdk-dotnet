@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  net48 (.NET Framework) test settings.
+
+  The VSTest .NET Framework testhost shadow-copies the test assembly into a temp
+  AppDomain by default. That temp copy does NOT bring the SQLitePCLRaw native asset
+  (runtimes/win-x64/native/e_sqlite3.dll) with it, so Microsoft.Data.Sqlite fails to
+  load e_sqlite3 and every disk-queue test throws TypeInitializationException.
+
+  Disabling the separate AppDomain runs the assembly in place in tests/bin/.../net48,
+  where the runtimes/RID/native/ tree sits next to the dll and SQLitePCLRaw's loader
+  finds it. This mirrors how a real net48 consumer app loads the native lib (proven
+  independently by the net48 consumer smoke app, R-A).
+
+  Apply only for the net48 TFM by passing this file via the settings switch to
+  dotnet test (see the per-TFM commands in the test-writer handoff notes).
+-->
+<RunSettings>
+  <RunConfiguration>
+    <DisableAppDomain>true</DisableAppDomain>
+    <TargetPlatform>x64</TargetPlatform>
+  </RunConfiguration>
+</RunSettings>

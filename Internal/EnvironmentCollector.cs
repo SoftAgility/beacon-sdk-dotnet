@@ -1,9 +1,9 @@
 using System.Globalization;
 using System.Runtime.InteropServices;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using SoftAgility.Beacon.Internal.Compat;
 
 namespace SoftAgility.Beacon.Internal;
 
@@ -56,14 +56,15 @@ internal static class EnvironmentCollector
     private static string ComputeMachineNameHash()
     {
         var nameBytes = Encoding.UTF8.GetBytes(Environment.MachineName);
-        var hashBytes = SHA256.HashData(nameBytes);
-        return Convert.ToHexString(hashBytes).ToLowerInvariant();
+        var hashBytes = Hashing.Sha256(nameBytes);
+        return Hex.Lower(hashBytes);
     }
 
     private static string ComputeRamBucket()
     {
         try
         {
+#if NET6_0_OR_GREATER
             var memoryInfo = GC.GetGCMemoryInfo();
             var totalBytes = memoryInfo.TotalAvailableMemoryBytes;
             var totalMb = totalBytes / (1024.0 * 1024.0);
@@ -77,6 +78,12 @@ internal static class EnvironmentCollector
                 < 32768 => "16-32 GB",
                 _ => "> 32 GB"
             };
+#else
+            // GC.GetGCMemoryInfo() (added .NET Core 3.0) is unavailable on
+            // netstandard2.0 / .NET Framework. Per PRD Q-2, return "unknown"
+            // on the down-level path (no P/Invoke for v1).
+            return "unknown";
+#endif
         }
         catch
         {

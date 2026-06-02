@@ -1,24 +1,59 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <!-- Multi-target to exercise the SDK's down-level branches:
+         - net48  : compiles & runs the netstandard2.0/net48 #else branches (R6-R12);
+                    also the only TFM where the SDK lights up WINDOWS screen dims.
+         - net6.0 : the only modern TFM that takes the CancelAsync #else branch (R11a).
+         - net8.0 : the fast-path / modern baseline. -->
+    <TargetFrameworks>net8.0;net6.0;net48</TargetFrameworks>
+    <LangVersion>12</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <RootNamespace>SoftAgility.Beacon.Tests</RootNamespace>
+
+    <!-- net6.0 runtime is NOT installed on this machine (only net8 + net10). Roll the
+         net6-compiled assembly forward to the next installed major so it executes; the
+         net6 #else branches are still compiled in, so running on net8 validates them. -->
+    <RollForward>LatestMajor</RollForward>
+
+    <!-- .NET Framework needs binding redirects for the System.Text.Json 8.0 dependency
+         closure (System.Memory / System.Buffers / S.R.CS.Unsafe) pulled in transitively. -->
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
   </PropertyGroup>
 
+  <!-- The net48 SDK build defines WINDOWS (screen-dimension enrichment). The test
+       project resolves that build via ProjectReference, so the test code must define
+       the SAME symbol to keep its #if WINDOWS expectations aligned with what the
+       resolved SDK actually emits (EnvironmentCollectorTests display-dims gate). -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net48'">
+    <DefineConstants>$(DefineConstants);WINDOWS</DefineConstants>
+  </PropertyGroup>
+
+  <!-- Test-runner packages pinned to versions that restore & execute under .NET
+       Framework 4.8 as well as modern .NET. xUnit 2.9.x + visualstudio runner 2.8.x +
+       Microsoft.NET.Test.Sdk 17.12.x all ship net48-compatible assets. (The project
+       previously carried .NET 10-era Microsoft.Extensions.* 10.0.0 refs, which do not
+       restore on net48 — downgraded to 8.0.0, matching the SDK's own dependency floor.) -->
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.3.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
     <PackageReference Include="xunit" Version="2.9.3" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="FluentAssertions" Version="8.8.0" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.0" />
+    <PackageReference Include="FluentAssertions" Version="6.12.2" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.0" />
+  </ItemGroup>
+
+  <!-- net48 does not auto-reference System.Net.Http; tests that new up HttpClient /
+       inspect HttpResponseMessage need the explicit reference (mirrors the SDK csproj). -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
+    <Reference Include="System.Net.Http" />
   </ItemGroup>
 
   <ItemGroup>

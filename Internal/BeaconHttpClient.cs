@@ -1,8 +1,10 @@
 using System.Net;
+using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using SoftAgility.Beacon.Internal.Compat;
 
 namespace SoftAgility.Beacon.Internal;
 
@@ -321,7 +323,7 @@ internal sealed class BeaconHttpClient : IDisposable
         var statusCode = response.StatusCode;
 
         // 2xx success
-        if (response.IsSuccessStatusCode && statusCode != HttpStatusCode.MultiStatus)
+        if (response.IsSuccessStatusCode && statusCode != HttpStatus.MultiStatus)
         {
             return new FlushResult
             {
@@ -337,11 +339,11 @@ internal sealed class BeaconHttpClient : IDisposable
         // ILogger. Truncate to 500 chars so a giant 5xx HTML page can't
         // flood the customer's logs.
         var body = string.Empty;
-        if (statusCode != HttpStatusCode.MultiStatus)
+        if (statusCode != HttpStatus.MultiStatus)
         {
             try
             {
-                body = await response.Content.ReadAsStringAsync(cancellationToken);
+                body = await HttpContentCompat.ReadAsStringCompatAsync(response.Content, cancellationToken);
                 if (body.Length > 500)
                 {
                     body = body[..500] + "...(truncated)";
@@ -355,12 +357,12 @@ internal sealed class BeaconHttpClient : IDisposable
         var bodySuffix = string.IsNullOrEmpty(body) ? string.Empty : $" — {body}";
 
         // 207 Multi-Status (partial success)
-        if (statusCode == HttpStatusCode.MultiStatus)
+        if (statusCode == HttpStatus.MultiStatus)
         {
             var rejected = new List<RejectedEvent>();
             try
             {
-                var content = await response.Content.ReadAsStringAsync(cancellationToken);
+                var content = await HttpContentCompat.ReadAsStringCompatAsync(response.Content, cancellationToken);
                 using var doc = JsonDocument.Parse(content);
 
                 if (doc.RootElement.TryGetProperty("results", out var results))
@@ -480,7 +482,7 @@ internal sealed class BeaconHttpClient : IDisposable
     {
         try
         {
-            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            var body = await HttpContentCompat.ReadAsStringCompatAsync(response.Content, cancellationToken);
             return body.Length > 500 ? body[..500] + "...(truncated)" : body;
         }
         catch

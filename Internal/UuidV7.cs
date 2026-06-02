@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+using SoftAgility.Beacon.Internal.Compat;
 
 namespace SoftAgility.Beacon.Internal;
 
@@ -65,7 +65,7 @@ internal static class UuidV7
         bytes[7] = (byte)(seq & 0xFF);
 
         // Bytes 8-15: variant (10xx) + random
-        RandomNumberGenerator.Fill(bytes.Slice(8, 8));
+        Rng.Fill(bytes.Slice(8, 8));
         bytes[8] = (byte)((bytes[8] & 0x3F) | 0x80); // Set variant to 10xx
 
         // Convert to Guid — .NET Guid constructor expects a specific byte layout

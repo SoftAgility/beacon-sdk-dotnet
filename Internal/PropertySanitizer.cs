@@ -122,8 +122,14 @@ internal static class PropertySanitizer
         // Accept primitives, common scalar types, and enums as flat values.
         // These all produce sensible output via ToString() and are consistent
         // with the anonymous-object path (which JSON-serializes first).
-        if (value is string or decimal or DateTime or DateTimeOffset or DateOnly
-            or TimeOnly or TimeSpan or Guid or Uri)
+        // DateOnly / TimeOnly were added in .NET 6 and do not exist down-level,
+        // so they are simply absent from the allowlist there (R10). No behavior
+        // loss: a consumer on net48/netstandard2.0 cannot construct those types.
+        if (value is string or decimal or DateTime or DateTimeOffset
+#if NET6_0_OR_GREATER
+            or DateOnly or TimeOnly
+#endif
+            or TimeSpan or Guid or Uri)
             return false;
 
         var type = value.GetType();
