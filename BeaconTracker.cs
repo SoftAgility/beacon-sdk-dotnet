@@ -77,12 +77,21 @@ public sealed class BeaconTracker : IBeaconTracker
 
     private BeaconHttpClient? _httpClient;
     private DiskQueue? _diskQueue;
+    private PendingSessionEndStore? _pendingSessionEndStore;
 
     private readonly IReadOnlyList<(string Category, string Name)> _definedEvents;
     private readonly string? _environmentDataBase64;
     private readonly BreadcrumbBuffer? _breadcrumbs;
 
     private string? _sessionId;
+    private DateTimeOffset _sessionStartedAt; // Start instant of the active session (for the self-contained durable end record)
+    // Session-scoped snapshots captured at session start. The self-contained durable end record is
+    // stamped from THESE, not the live _actorId/_accountId/_licenseId, so an Identify()/SetAccount()/
+    // SetLicense() change mid-session (or repointing to a new session before the prior one is ended)
+    // never mis-stamps the prior session's durable end. (session-end-durability PRD, Revision 2 High)
+    private string _sessionActorId = string.Empty;
+    private string? _sessionAccountId;
+    private string? _sessionLicenseId;
     private string? _actorId;
     private string? _accountId;
     private string? _licenseId;
@@ -168,7 +177,9 @@ public sealed class BeaconTracker : IBeaconTracker
             _options.ApiKey,
             _logger);
 
-        // Initialize disk queue
+        // Initialize disk queue + durable pending-session-end store. Both live in the same
+        // per-product DB file but use independent connections/tables (the pending-end store is
+        // a typed sibling of the homogeneous event queue — see PendingSessionEndStore).
         try
         {
             var queuePath = Path.Combine(
@@ -178,6 +189,15 @@ public sealed class BeaconTracker : IBeaconTracker
                 SanitizeProductForPath(_options.Product),
                 "queue.db");
             _diskQueue = new DiskQueue(queuePath, _logger);
+
+            try
+            {
+                _pendingSessionEndStore = new PendingSessionEndStore(queuePath, _logger);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Beacon: failed to initialize pending session-end store. Durable session-end unavailable.");
+            }
         }
         catch (Exception ex)
         {
@@ -466,23 +486,35 @@ public sealed class BeaconTracker : IBeaconTracker
 
             lock (_sessionLock)
             {
+                // If a session is already active, end it FIRST — before repointing _actorId or the
+                // session-scoped snapshots to the new session. EndSessionInternal persists the prior
+                // session's self-contained durable record from the OLD session snapshots, so the
+                // prior session is stamped with its own actor/account/license, not the new one.
+                if (_sessionId is not null)
+                {
+                    EndSessionInternal("normal");
+                }
+
                 // Store the actor ID so subsequent Track()/StartSession() calls can use it
                 _actorId = actorId;
 
-                // If a session is already active, end it first
-                if (_sessionId is not null)
-                {
-                    _ = EndSessionInternal("normal");
-                }
-
                 var newSessionId = UuidV7.NewId().ToString();
+                var startedAt = DateTimeOffset.UtcNow;
                 _sessionId = newSessionId;
+                _sessionStartedAt = startedAt; // Captured for the self-contained durable end record
                 _environmentSent = false; // Reset so env data is sent on next flush
 
                 // Snapshot account/license context for the session-start payload
                 // (account-license-context PRD §8.1)
                 var sessionAccountId = _accountId;
                 var sessionLicenseId = _licenseId;
+
+                // Capture session-scoped snapshots for THIS session's durable end record. These are
+                // read (not the live fields) by PersistPendingEndAndClearSession when this session
+                // ends, so a later Identify()/SetAccount()/SetLicense() never mis-stamps this end.
+                _sessionActorId = actorId;
+                _sessionAccountId = sessionAccountId;
+                _sessionLicenseId = sessionLicenseId;
 
                 // Send session start to the backend (fire and forget)
                 _ = Task.Run(async () =>
@@ -496,7 +528,7 @@ public sealed class BeaconTracker : IBeaconTracker
                                 actorId,
                                 _options.Product,
                                 _options.ProductVersion,
-                                DateTimeOffset.UtcNow,
+                                startedAt,
                                 sessionAccountId,
                                 sessionLicenseId);
                         }
@@ -537,7 +569,7 @@ public sealed class BeaconTracker : IBeaconTracker
 
             lock (_sessionLock)
             {
-                _ = EndSessionInternal("normal");
+                EndSessionInternal("normal");
             }
         }
         catch (Exception ex)
@@ -571,6 +603,54 @@ public sealed class BeaconTracker : IBeaconTracker
         }
     }
 
+    /// <summary>
+    /// Ends the active session and awaits its delivery to the backend (when online).
+    /// <para>
+    /// This is the awaitable counterpart to <see cref="EndSession"/>. It is declared as a
+    /// concrete method on <see cref="BeaconTracker"/> and is intentionally NOT on
+    /// <see cref="IBeaconTracker"/> — adding it to the public interface would break external
+    /// implementers/mocks, and default interface methods are unavailable on the
+    /// <c>netstandard2.0</c> / <c>net48</c> targets (see session-end-durability PRD, Part B).
+    /// </para>
+    /// <para>
+    /// Equivalent to <c>EndSession(); await FlushAsync();</c>: the durable pending-end record is
+    /// persisted, then the pending-end store is drained (after the event queues). The delivery is
+    /// guaranteed for an online app PROVIDED the session start has landed; a transient 404 is
+    /// tolerated (the self-contained record is handled by the server's create-on-recovery path).
+    /// </para>
+    /// </summary>
+    /// <param name="cancellationToken">Optional cancellation token.</param>
+    public async Task EndSessionAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            if (!_options.Enabled)
+                return;
+
+            if (_disposed)
+            {
+                _logger?.LogWarning("Beacon: method called on disposed tracker - ignored.");
+                return;
+            }
+
+            if (IsOptedOut)
+                return;
+
+            // Persist the durable end record (and fire the best-effort live send).
+            lock (_sessionLock)
+            {
+                EndSessionInternal("normal");
+            }
+
+            // Await delivery: FlushAsync drains the event queues AND the pending-end store.
+            await FlushCoreAsync(cancellationToken, waitForSemaphore: true);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Beacon: error in EndSessionAsync().");
+        }
+    }
+
     // ── Consent API (FR-1120, FR-1121) ───────────────────────────────
 
     /// <inheritdoc />
@@ -584,6 +664,10 @@ public sealed class BeaconTracker : IBeaconTracker
 
             // Drain in-memory queue without sending (FR-1120)
             DrainMemoryQueueSilently();
+
+            // Purge durable pending session-ends — do NOT deliver them (consent-respecting).
+            // (session-end-durability PRD: "Purge pending session-ends on OptOut()".)
+            _pendingSessionEndStore?.Clear();
 
             // Stop the flush timer (FR-1120)
             _flushTimer?.Change(Timeout.Infinite, Timeout.Infinite);
@@ -668,14 +752,13 @@ public sealed class BeaconTracker : IBeaconTracker
         {
             // Operates regardless of Enabled or opt-out state (FR-1122)
 
-            // Step 1: End active session (fire-and-forget)
+            // Step 1: Clear active session. Reset rotates the anonymous identity, so the
+            // active session is abandoned along with the old identity — and the durable
+            // pending-end store is purged below (do not deliver), consistent with the
+            // consent-respecting posture shared with OptOut(). (session-end-durability PRD)
             lock (_sessionLock)
             {
-                if (_sessionId is not null)
-                {
-                    _ = EndSessionInternal("normal");
-                    // _sessionId is cleared by EndSessionInternal
-                }
+                _sessionId = null;
 
                 // Step 2: Clear actor ID and account/license context
                 // (account-license-context PRD §8.1: Reset() clears both)
@@ -684,8 +767,10 @@ public sealed class BeaconTracker : IBeaconTracker
                 _licenseId = null;
             }
 
-            // Step 3: Drain in-memory queue
+            // Step 3: Drain in-memory queue + purge the durable pending-session-end store
+            // (clears it — do not deliver).
             DrainMemoryQueueSilently();
+            _pendingSessionEndStore?.Clear();
 
             // Step 4: Clear breadcrumbs
             _breadcrumbs?.Clear();
@@ -1056,11 +1141,22 @@ public sealed class BeaconTracker : IBeaconTracker
                 // blocking app shutdown with network I/O that may hang or fail.
                 WriteRemainingToDisk();
 
-                // Clear session state locally — the server infers session end
-                // from inactivity or the next session-start event.
-                lock (_sessionLock)
+                // Durable session-end: persist a self-contained pending-end record (BEFORE
+                // clearing _sessionId), then attempt a best-effort live send bounded by
+                // ShutdownFlushTimeout using an INDEPENDENT CTS (not _shutdownCts, which was
+                // cancelled above). On success the record is deleted; otherwise it is delivered
+                // on the next launch as sdk_recovery with the original ended_at.
+                if (!IsOptedOut)
                 {
-                    _sessionId = null;
+                    await EndSessionOnDisposeAsync();
+                }
+                else
+                {
+                    // Opted out — do not persist or deliver; just clear local session state.
+                    lock (_sessionLock)
+                    {
+                        _sessionId = null;
+                    }
                 }
             }
         }
@@ -1070,6 +1166,7 @@ public sealed class BeaconTracker : IBeaconTracker
         }
         finally
         {
+            _pendingSessionEndStore?.Dispose();
             _diskQueue?.Dispose();
             _httpClient?.Dispose();
             _flushSemaphore.Dispose();
@@ -1226,6 +1323,14 @@ public sealed class BeaconTracker : IBeaconTracker
 
             // 2. Flush memory queue
             await FlushMemoryQueueAsync(cancellationToken);
+
+            // 3. Drain durable pending session-ends (next-launch sdk_recovery delivery, and the
+            //    Part B awaitable guarantee via FlushAsync). Runs after the event queues so a
+            //    just-tracked event in this flush is delivered before the session's end.
+            if (_halted)
+                return;
+
+            await DrainPendingSessionEndsAsync(cancellationToken);
         }
         finally
         {
@@ -1489,39 +1594,247 @@ public sealed class BeaconTracker : IBeaconTracker
         }
     }
 
-    private Task EndSessionInternal(string endReason, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Persists a durable, self-contained pending session-end record for the active session
+    /// (stamping <c>ended_at</c> at write time), then clears <c>_sessionId</c>.
+    /// <para>
+    /// MUST be called under <see cref="_sessionLock"/>. The durable write happens BEFORE the
+    /// session id is cleared so a crash between the two never loses the end. Returns the persisted
+    /// record (with its assigned <see cref="PendingSessionEnd.RowId"/>) for the caller's best-effort
+    /// immediate send, or null when there was no active session.
+    /// </para>
+    /// </summary>
+    private PendingSessionEnd? PersistPendingEndAndClearSession(string endReason)
     {
-        // Must be called under _sessionLock
+        // Must be called under _sessionLock.
         var currentSessionId = _sessionId;
         if (currentSessionId is null)
-            return Task.CompletedTask;
+            return null;
+
+        // Read the SESSION-SCOPED snapshots captured at session start, NOT the live
+        // _actorId/_accountId/_licenseId. This makes the durable record self-contained and immune to
+        // an Identify()/SetAccount()/SetLicense() change (or a new StartSession repointing the live
+        // actor) that happens between this session's start and its end.
+        var record = new PendingSessionEnd
+        {
+            SessionId = currentSessionId,
+            ActorId = !string.IsNullOrEmpty(_sessionActorId) ? _sessionActorId : (_deviceId ?? string.Empty),
+            Product = _options.Product,
+            ProductVersion = _options.ProductVersion,
+            StartedAt = _sessionStartedAt.ToString("O"),
+            AccountId = _sessionAccountId,
+            LicenseId = _sessionLicenseId,
+            EndedAt = DateTimeOffset.UtcNow.ToString("O"), // Stamped at write time, NOT delivery time
+            EndReason = endReason
+        };
+
+        // Durable write BEFORE clearing _sessionId. The store uses a 200ms busy timeout so this is
+        // effectively non-blocking. A failed write returns RowId 0 — the best-effort send still runs.
+        var rowId = _pendingSessionEndStore?.Enqueue(record) ?? 0;
 
         _sessionId = null;
 
-        // Fire and forget session end
+        return rowId > 0
+            ? new PendingSessionEnd
+            {
+                RowId = rowId,
+                SessionId = record.SessionId,
+                ActorId = record.ActorId,
+                Product = record.Product,
+                ProductVersion = record.ProductVersion,
+                StartedAt = record.StartedAt,
+                AccountId = record.AccountId,
+                LicenseId = record.LicenseId,
+                EndedAt = record.EndedAt,
+                EndReason = record.EndReason
+            }
+            : record; // store unavailable / write failed — caller still attempts the live send
+    }
+
+    /// <summary>
+    /// Ends the active session: persists the durable record (under the lock), then fires a
+    /// best-effort, non-blocking immediate send. On a successful live send the durable record is
+    /// deleted; otherwise it remains for next-launch <c>sdk_recovery</c> delivery.
+    /// MUST be called under <see cref="_sessionLock"/> (for the persist+clear step).
+    /// </summary>
+    private void EndSessionInternal(string endReason)
+    {
+        var record = PersistPendingEndAndClearSession(endReason);
+        if (record is null)
+            return;
+
         var httpClient = _httpClient;
         if (httpClient is null)
-            return Task.CompletedTask;
+            return;
 
-        return Task.Run(async () =>
+        // Fire-and-forget best-effort live send. EndSession()/StartSession()/Reset() stay
+        // non-blocking; durability is guaranteed by the record already on disk.
+        _ = Task.Run(() => TryDeliverLiveEndAsync(record));
+    }
+
+    /// <summary>
+    /// Best-effort live delivery of a just-persisted session-end as <c>end_reason = "normal"</c>.
+    /// On success the durable record is deleted. Uses the minimal end payload (the session-start
+    /// is presumed to have landed in the live online path). Never throws.
+    /// </summary>
+    private async Task TryDeliverLiveEndAsync(PendingSessionEnd record)
+    {
+        var httpClient = _httpClient;
+        if (httpClient is null)
+            return;
+
+        try
         {
-            try
+            // Minimal live send: pass the persisted ISO ended_at straight through (no parse /
+            // re-serialize round-trip). The session-start is presumed to have landed online.
+            var result = await httpClient.SendSessionEndAsync(
+                record.SessionId,
+                record.EndedAt,
+                record.EndReason,
+                actorId: null,
+                product: null,
+                productVersion: null,
+                startedAt: null,
+                accountId: null,
+                licenseId: null);
+
+            if (result == SessionEndResult.Success && record.RowId > 0)
+                _pendingSessionEndStore?.Delete(record.RowId);
+        }
+        catch (OperationCanceledException)
+        {
+            // Best-effort — record persists for next-launch recovery.
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Beacon: failed to send session end.");
+        }
+    }
+
+    /// <summary>
+    /// Dispose-time blocking best-effort send, bounded by <see cref="BeaconOptions.ShutdownFlushTimeout"/>.
+    /// Uses an INDEPENDENT timeout <see cref="CancellationTokenSource"/> — NOT <c>_shutdownCts</c>,
+    /// which <see cref="DisposeAsync"/> cancels early. Persists the durable record first (under the
+    /// lock), then attempts the live send within the timeout; on success deletes the record,
+    /// otherwise leaves it for next-launch recovery. When <see cref="BeaconOptions.ShutdownFlushTimeout"/>
+    /// is zero the blocking send is skipped (disk-only).
+    /// </summary>
+    private async Task EndSessionOnDisposeAsync()
+    {
+        PendingSessionEnd? record;
+        lock (_sessionLock)
+        {
+            record = PersistPendingEndAndClearSession("normal");
+        }
+
+        if (record is null)
+            return;
+
+        var timeout = _options.ShutdownFlushTimeout;
+        if (timeout <= TimeSpan.Zero)
+            return; // Skip the blocking send — record persists for next-launch recovery.
+
+        var httpClient = _httpClient;
+        if (httpClient is null)
+            return;
+
+        // Independent timeout CTS — NOT _shutdownCts (cancelled early by DisposeAsync).
+        using var timeoutCts = new CancellationTokenSource(timeout);
+        try
+        {
+            var result = await httpClient.SendSessionEndAsync(
+                record.SessionId,
+                record.EndedAt,
+                record.EndReason,
+                actorId: null,
+                product: null,
+                productVersion: null,
+                startedAt: null,
+                accountId: null,
+                licenseId: null,
+                timeoutCts.Token);
+
+            if (result == SessionEndResult.Success && record.RowId > 0)
+                _pendingSessionEndStore?.Delete(record.RowId);
+        }
+        catch (OperationCanceledException)
+        {
+            // Timeout/grace expired — record persists for next-launch recovery.
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Beacon: failed to send session end during dispose.");
+        }
+    }
+
+    /// <summary>
+    /// Delivers any persisted pending session-end records as <c>end_reason = "sdk_recovery"</c>,
+    /// using each record's ORIGINAL <c>ended_at</c> and full self-contained start context (so the
+    /// server's create-on-recovery path can materialize an absent session). On success the record
+    /// is deleted. A 404 (<c>session_not_found</c>) is NON-TERMINAL: the record is left for the
+    /// create-on-recovery upsert. Other failures leave the record for a later cycle/launch.
+    /// </summary>
+    private async Task DrainPendingSessionEndsAsync(CancellationToken cancellationToken)
+    {
+        var store = _pendingSessionEndStore;
+        var httpClient = _httpClient;
+        if (store is null || httpClient is null)
+            return;
+
+        // Skip delivery entirely when opted out — purge happens in OptOut()/Reset().
+        if (IsOptedOut)
+            return;
+
+        const int batchSize = 100;
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var batch = store.DequeueUpTo(batchSize);
+            if (batch.Count == 0)
+                break;
+
+            foreach (var record in batch)
             {
-                await httpClient.SendSessionEndAsync(
-                    currentSessionId,
-                    DateTimeOffset.UtcNow,
-                    endReason,
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var result = await httpClient.SendSessionEndAsync(
+                    record.SessionId,
+                    record.EndedAt,                 // ORIGINAL ended_at, not now()
+                    "sdk_recovery",
+                    record.ActorId,
+                    record.Product,
+                    record.ProductVersion,
+                    record.StartedAt,
+                    record.AccountId,
+                    record.LicenseId,
                     cancellationToken);
+
+                if (result == SessionEndResult.Success)
+                {
+                    store.Delete(record.RowId);
+                }
+                else if (result == SessionEndResult.SessionNotFound)
+                {
+                    // 404 is NON-TERMINAL for a recovery delivery: we sent the full self-contained
+                    // payload, so a create-on-recovery server upserts the session (2xx). A 404 means
+                    // an older server without create-on-recovery — retrying would 404 forever, so we
+                    // drop locally rather than retry indefinitely (the queue must not stall on a 404).
+                    _logger?.LogWarning(
+                        "Beacon: recovery session-end for {SessionId} returned 404 (create-on-recovery unavailable). Dropping to avoid an indefinite retry.",
+                        record.SessionId);
+                    store.Delete(record.RowId);
+                }
+                else
+                {
+                    // Network/server error — leave the whole remaining queue for the next cycle.
+                    return;
+                }
             }
-            catch (OperationCanceledException)
-            {
-                // Grace period expired — session end is best-effort
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogWarning(ex, "Beacon: failed to send session end.");
-            }
-        });
+
+            if (batch.Count < batchSize)
+                break;
+        }
     }
 
     private static void ValidateActorId(string actorId)

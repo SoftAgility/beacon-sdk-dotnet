@@ -6,6 +6,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [3.3.0] - 2026-06-04
+
+### Added
+
+- **Durable session-end on shutdown — clean app closes are no longer lost.** Previously, closing the app or calling `EndSession()` sent the session end fire-and-forget, so the request was usually abandoned when the process exited; the server only closed the session via its inactivity timeout (recorded as a `timeout`, up to a day later). Now the SDK persists a self-contained session-end record (session id, actor, product/version, started-at, account/license, ended-at) to a local SQLite store **before** shutdown completes, then makes a best-effort immediate send. Anything not delivered at shutdown is sent on the **next launch** as an `sdk_recovery` end carrying the *original* end time — so session duration and completion are recorded faithfully across offline closes, crashes, and force-kills. Multiple sessions ended in one run are each delivered. (The recovery/supersede behavior requires the matching backend support; a live `normal` end while online works against the existing endpoint.)
+- **`BeaconTracker.EndSessionAsync()`** — awaitable session end. `tracker.EndSession(); await tracker.FlushAsync();` (or `await tracker.EndSessionAsync();`) now guarantees the end is delivered when online; `FlushAsync()` also drains any pending session-end records. Added as a concrete method on `BeaconTracker` — `IBeaconTracker` is unchanged, so this is additive and SemVer-minor safe.
+- **`BeaconOptions.ShutdownFlushTimeout`** (default 2 seconds; `TimeSpan.Zero` to skip the blocking send and persist-only) — bounds the best-effort send during `Dispose`.
+
+### Changed
+
+- `EndSession()` is no longer a lossy fire-and-forget — it is backed by the durable store, so an end is never dropped because the process exited mid-request.
+- `OptOut()` and `Reset()` now purge any pending session-end records (consent-respecting — pending ends are not delivered after opt-out).
+
 ## [3.2.1] - 2026-06-02
 
 ### Changed

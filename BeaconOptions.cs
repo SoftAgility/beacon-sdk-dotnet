@@ -72,4 +72,17 @@ public class BeaconOptions
     /// Optional logger for SDK diagnostics. Default: null (silent).
     /// </summary>
     public ILogger? Logger { get; set; }
+
+    /// <summary>
+    /// Maximum time the SDK will spend on the best-effort, blocking session-end send during
+    /// <c>Dispose()</c> / <c>EndSession()</c> when a session is active.
+    /// <para>
+    /// The durable pending-end record is always persisted locally first (it survives offline and
+    /// force-kill), so this timeout only bounds the optimization that delivers the end <i>now</i>
+    /// while online. Default: 2 seconds. Set to <see cref="TimeSpan.Zero"/> to SKIP the blocking
+    /// send entirely (disk-only) — the end is then delivered on the next SDK launch as
+    /// <c>sdk_recovery</c>. Negative values are treated as <see cref="TimeSpan.Zero"/>.
+    /// </para>
+    /// </summary>
+    public TimeSpan ShutdownFlushTimeout { get; set; } = TimeSpan.FromSeconds(2);
 }

@@ -37,6 +37,24 @@ internal sealed class RejectedEvent
 }
 
 /// <summary>
+/// Outcome of a session-end delivery, distinguishing the cases the durable pending-end
+/// queue must treat differently:
+/// <list type="bullet">
+/// <item><see cref="Success"/> — delivered; the durable record may be deleted.</item>
+/// <item><see cref="SessionNotFound"/> — HTTP 404 (session_not_found). NON-TERMINAL for a
+/// recovery delivery: leave the self-contained record for the server's create-on-recovery
+/// upsert. The SDK must not retry a 404 indefinitely for a non-recovery end either.</item>
+/// <item><see cref="Failed"/> — network/server/other error; retry on the next cycle/launch.</item>
+/// </list>
+/// </summary>
+internal enum SessionEndResult
+{
+    Success,
+    SessionNotFound,
+    Failed
+}
+
+/// <summary>
 /// Wraps HttpClient for all Beacon API communication. Handles events, session start, and session end.
 /// </summary>
 internal sealed class BeaconHttpClient : IDisposable
@@ -176,7 +194,10 @@ internal sealed class BeaconHttpClient : IDisposable
     }
 
     /// <summary>
-    /// Sends a session end request to POST /v1/events/sessions/end.
+    /// Sends a minimal session-end request to POST /v1/events/sessions/end. Used by the live
+    /// online path where the session-start has already landed: only <c>session_id</c>,
+    /// <c>ended_at</c>, and <c>end_reason</c> are required.
+    /// Returns <c>true</c> on HTTP 2xx.
     /// </summary>
     public async Task<bool> SendSessionEndAsync(
         string sessionId,
@@ -184,14 +205,70 @@ internal sealed class BeaconHttpClient : IDisposable
         string endReason,
         CancellationToken cancellationToken = default)
     {
+        var result = await SendSessionEndAsync(
+            sessionId,
+            endedAt.ToString("O"),
+            endReason,
+            actorId: null,
+            product: null,
+            productVersion: null,
+            startedAt: null,
+            accountId: null,
+            licenseId: null,
+            cancellationToken).ConfigureAwait(false);
+
+        return result == SessionEndResult.Success;
+    }
+
+    /// <summary>
+    /// Sends a session-end request to POST /v1/events/sessions/end with the full self-contained
+    /// recovery payload. For a <c>sdk_recovery</c> delivery, pass the original start context
+    /// (<paramref name="actorId"/>, <paramref name="product"/>, <paramref name="productVersion"/>,
+    /// <paramref name="startedAt"/>, and optional <paramref name="accountId"/> /
+    /// <paramref name="licenseId"/>) so the server's create-on-recovery path can materialize an
+    /// absent session. Optional fields that are null are OMITTED from the body (matching the
+    /// session-start payload's omit-when-null convention).
+    /// <para>
+    /// Returns a <see cref="SessionEndResult"/>: a 404 maps to
+    /// <see cref="SessionEndResult.SessionNotFound"/> (non-terminal — the caller leaves the durable
+    /// record for create-on-recovery rather than dropping it).
+    /// </para>
+    /// </summary>
+    public async Task<SessionEndResult> SendSessionEndAsync(
+        string sessionId,
+        string endedAtIso,
+        string endReason,
+        string? actorId,
+        string? product,
+        string? productVersion,
+        string? startedAt,
+        string? accountId,
+        string? licenseId,
+        CancellationToken cancellationToken = default)
+    {
         try
         {
-            var body = new
+            // Dictionary so optional start-context fields can be omitted (not serialized as null),
+            // matching SendSessionStartAsync / the Track() payload pattern.
+            var body = new Dictionary<string, object?>
             {
-                SessionId = sessionId,
-                EndedAt = endedAt.ToString("O"),
-                EndReason = endReason
+                ["session_id"] = sessionId,
+                ["ended_at"] = endedAtIso,
+                ["end_reason"] = endReason
             };
+
+            if (actorId is not null)
+                body["actor_id"] = actorId;
+            if (product is not null)
+                body["product"] = product;
+            if (productVersion is not null)
+                body["product_version"] = productVersion;
+            if (startedAt is not null)
+                body["started_at"] = startedAt;
+            if (accountId is not null)
+                body["account_id"] = accountId;
+            if (licenseId is not null)
+                body["license_id"] = licenseId;
 
             using var request = new HttpRequestMessage(HttpMethod.Post, "v1/events/sessions/end");
             request.Content = new StringContent(
@@ -201,16 +278,22 @@ internal sealed class BeaconHttpClient : IDisposable
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
 
             using var response = await _httpClient.SendAsync(request, cancellationToken);
-            if (!response.IsSuccessStatusCode)
-            {
-                var responseBody = await ReadBodyTruncatedAsync(response, cancellationToken);
-                _logger?.LogWarning(
-                    "Beacon: session end POST returned HTTP {StatusCode} for session {SessionId}{BodySuffix}",
-                    (int)response.StatusCode,
-                    sessionId,
-                    string.IsNullOrEmpty(responseBody) ? "" : $" — {responseBody}");
-            }
-            return response.IsSuccessStatusCode;
+
+            if (response.IsSuccessStatusCode)
+                return SessionEndResult.Success;
+
+            var responseBody = await ReadBodyTruncatedAsync(response, cancellationToken);
+            _logger?.LogWarning(
+                "Beacon: session end POST returned HTTP {StatusCode} for session {SessionId}{BodySuffix}",
+                (int)response.StatusCode,
+                sessionId,
+                string.IsNullOrEmpty(responseBody) ? "" : $" — {responseBody}");
+
+            // 404 session_not_found is non-terminal: leave the record for create-on-recovery.
+            if (response.StatusCode == HttpStatusCode.NotFound)
+                return SessionEndResult.SessionNotFound;
+
+            return SessionEndResult.Failed;
         }
         catch (OperationCanceledException)
         {
@@ -219,7 +302,7 @@ internal sealed class BeaconHttpClient : IDisposable
         catch (Exception ex)
         {
             _logger?.LogWarning(ex, "Beacon: failed to send session end.");
-            return false;
+            return SessionEndResult.Failed;
         }
     }
 
