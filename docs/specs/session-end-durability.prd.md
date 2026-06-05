@@ -1,6 +1,6 @@
 # Session-end durability (.NET SDK) — capture clean app closes instead of relying on the reaper
 
-- **Status:** READY-TO-IMPLEMENT (post-codex revision 3 — converged; server half split out at revision 4)
+- **Status:** Complete — implemented in `0580cb8` (3.3.0, 2026-06-04). Converged post-codex revision 3; server half split out at revision 4.
 - **Owner:** Matthew Clendening
 - **Created:** 2026-06-03
 - **Slug:** `session-end-durability`
@@ -146,3 +146,8 @@ Focused adversarial pass on the create-on-recovery seam. 1 High + 1 Medium of su
 
 ### Revision 4 — server half split out (2026-06-03)
 Parts C (server reconciliation + create-on-recovery) and D (reaper default) extracted to `usage-tracking/docs/specs/session-end-server-reconciliation.prd.md` as the shared foundation consumed by all three SDKs, with the SDK-facing recovery **wire contract** made explicit there. This PRD is now SDK-only (Parts A/B) and lists the server PRD as a dependency. No design change — the converged decisions are preserved, just relocated. The C++ SDK gets a sibling PRD (`beacon-sdk-cpp`) mirroring Parts A/B against the same server contract; the JS SDK needs only a minor hardening pass (it already sends a `normal` end on page-hide via `fetch(keepalive)`).
+
+### Implemented — `0580cb8` (3.3.0, 2026-06-04)
+Built via the agent pipeline (backend-builder → test-writer → backend-builder fix → code-reviewer SHIP IT; no qa-validator — library SDK, no web app). Delivered as designed: new `Internal/PendingSessionEndStore.cs` (SQLite `pending_session_ends` table, queue keyed by `session_id`, own connection + 200ms busy_timeout) + `PendingSessionEnd.cs`; `BeaconOptions.ShutdownFlushTimeout` (default 2s); `BeaconTracker` persist-before-clear with **per-session snapshots** of actor/account/license, independent-CTS bounded dispose send, next-launch `sdk_recovery` drain, `FlushAsync` drains pending ends, concrete `EndSessionAsync` (off `IBeaconTracker`), opt-out/Reset purge; `BeaconHttpClient` recovery overload (404→`SessionNotFound`, non-terminal). Server payload field names aligned (`product`/`product_version`/`actor_id`/`started_at`/`account_id`/`license_id`).
+
+**Delta from design:** the test-writer caught a real defect — `StartSession(actorId)` overwrote `_actorId` (and account/license) before ending the prior session, so the prior session's durable record captured the *new* actor; fixed by snapshotting actor/account/license per-session at start and reading the snapshot at persist time. All five TFMs build clean; 306/306 tests (19/19 durability) green on net8.0 + net48. SemVer-minor (additive; `IBeaconTracker` unchanged). Depends on the server foundation (`ce4f866`) for the `sdk_recovery`/supersede behavior. **Not yet published to NuGet.**
