@@ -98,6 +98,11 @@ public sealed class BeaconTracker : IBeaconTracker
     private bool _environmentSent;
     private bool _disposed;
     private bool _halted; // Set on 401 — no further flush attempts
+
+    // FR-2366: UTC ticks until which every send is suppressed after a 429. 0 = no cooldown.
+    // Stored as ticks so it can be read and written without a lock — Flush() checks it from
+    // the caller's thread while a flush may be setting it from the timer thread.
+    private long _rateLimitedUntilTicks;
     private int _memoryQueueCount; // Approximate count for size-triggered flush
 
     // Consent and identity fields (FR-1119 through FR-1126)
@@ -1313,6 +1318,18 @@ public sealed class BeaconTracker : IBeaconTracker
             if (IsOptedOut)
                 return;
 
+            // FR-2366: honour a server-issued Retry-After across the WHOLE cycle. Without this
+            // the next timer tick resumes immediately and is rejected again — the client keeps
+            // knocking for the rest of the minute and pays latency on every batch to learn
+            // what the server already told it once.
+            if (IsRateLimitCooldownActive(out var cooldownRemaining))
+            {
+                _logger?.LogDebug(
+                    "Beacon: flush skipped, rate-limit cooldown has {Seconds:F0}s remaining.",
+                    cooldownRemaining.TotalSeconds);
+                return;
+            }
+
             // 1. Flush disk-queued events first
             await FlushDiskQueueAsync(cancellationToken);
 
@@ -1330,12 +1347,65 @@ public sealed class BeaconTracker : IBeaconTracker
             if (_halted)
                 return;
 
+            // Session-ends are events too and are charged against the same budget. If the
+            // queues above tripped the limit, draining these now would just earn another 429.
+            if (IsRateLimitCooldownActive(out _))
+                return;
+
             await DrainPendingSessionEndsAsync(cancellationToken);
         }
         finally
         {
             _flushSemaphore.Release();
         }
+    }
+
+    /// <summary>
+    /// Upper bound on a server-issued Retry-After. The server's own bucket is 60s, so anything
+    /// beyond this is a misconfigured proxy or a hostile endpoint, and honouring it verbatim
+    /// would let one bad response silence telemetry for hours.
+    /// </summary>
+    private const int MaxRateLimitCooldownSeconds = 300;
+
+    /// <summary>
+    /// True while a server-issued Retry-After is still in force. <paramref name="remaining"/>
+    /// is the time left, for logging.
+    /// </summary>
+    private bool IsRateLimitCooldownActive(out TimeSpan remaining)
+    {
+        var untilTicks = Interlocked.Read(ref _rateLimitedUntilTicks);
+        if (untilTicks == 0)
+        {
+            remaining = TimeSpan.Zero;
+            return false;
+        }
+
+        var until = new DateTimeOffset(untilTicks, TimeSpan.Zero);
+        var now = DateTimeOffset.UtcNow;
+        if (now >= until)
+        {
+            remaining = TimeSpan.Zero;
+            return false;
+        }
+
+        remaining = until - now;
+        return true;
+    }
+
+    /// <summary>
+    /// Records a 429 and suppresses every send until the server's Retry-After has elapsed.
+    /// </summary>
+    private void EnterRateLimitCooldown(int retryAfterSeconds)
+    {
+        var seconds = Math.Max(1, Math.Min(retryAfterSeconds, MaxRateLimitCooldownSeconds));
+        Interlocked.Exchange(
+            ref _rateLimitedUntilTicks,
+            DateTimeOffset.UtcNow.AddSeconds(seconds).UtcTicks);
+
+        LastFlushStatus = FlushStatus.Offline;
+        _logger?.LogWarning(
+            "Beacon: rate limited by the server. Pausing sends for {Seconds}s; "
+            + "queued events are preserved and delivered after the pause.", seconds);
     }
 
     private async Task FlushDiskQueueAsync(CancellationToken cancellationToken)
@@ -1373,6 +1443,14 @@ public sealed class BeaconTracker : IBeaconTracker
                     // Permanent client error — delete from disk, events are unrecoverable
                     _diskQueue.Delete(batch.Select(b => b.Id));
                     _logger?.LogWarning("{Message}", result.ErrorMessage);
+                }
+                else if (result.IsRateLimited)
+                {
+                    // FR-2366: stop the drain. Every remaining batch is charged against the
+                    // same exhausted budget, so continuing can only produce more 429s.
+                    // Events stay on disk and go out after the cooldown.
+                    EnterRateLimitCooldown(result.RetryAfterSeconds);
+                    return;
                 }
                 else
                 {
@@ -1427,6 +1505,17 @@ public sealed class BeaconTracker : IBeaconTracker
                 // Permanent client error (400/403/404 etc.) — drop the batch
                 _logger?.LogWarning("{Message}", result.ErrorMessage);
             }
+            else if (result.IsRateLimited)
+            {
+                // FR-2366: stop the drain for this cycle. Write the rejected batch AND the rest
+                // of the queue to disk — the cooldown can run for a minute, and leaving them in
+                // memory would have them compete with newly tracked events for the memory
+                // budget, which is how a rate limit turns into silent data loss.
+                WriteToDiskQueue(batch);
+                WriteRemainingToDisk();
+                EnterRateLimitCooldown(result.RetryAfterSeconds);
+                return;
+            }
             else if (result.IsHardCapped)
             {
                 // Write to disk queue
@@ -1459,13 +1548,18 @@ public sealed class BeaconTracker : IBeaconTracker
 
         var result = await _httpClient!.SendEventsAsync(payloads, envData, cancellationToken);
 
-        // Handle rate limiting (429)
+        // Handle rate limiting (429).
+        //
+        // FR-2366: return immediately; do NOT sleep-then-retry here. The old code blocked this
+        // task for the full Retry-After and then retried the same batch once. Because the
+        // caller's drain loop carried on afterwards, a queue of N batches meant N sleeps and
+        // 2N rejected requests inside a single flush — a 60s Retry-After with ten batches
+        // queued blocked the flush for ten minutes and delivered nothing. Handing the result
+        // back lets the drain loop stop and set one cooldown for the whole client.
         if (result.IsRateLimited)
         {
             _logger?.LogWarning("{Message}", result.ErrorMessage);
-            await Task.Delay(TimeSpan.FromSeconds(result.RetryAfterSeconds), cancellationToken);
-            // Retry once after wait — include envData so it isn't lost on retry success
-            result = await _httpClient.SendEventsAsync(payloads, envData, cancellationToken);
+            return result;
         }
 
         // Handle 5xx with exponential backoff (3 attempts)
