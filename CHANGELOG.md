@@ -6,6 +6,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [3.4.0] - 2026-09-12
+
+### Changed
+
+- **A 429 now stops the flush for a cooldown instead of being retried through, batch by batch.** The previous behaviour was worse than it looked: on a rate-limit response the SDK slept the full `Retry-After` **on the flushing thread**, retried the same batch once, and then — because the drain loop carried on regardless — moved to the next batch and did it again. A queue of ten batches against a 60-second `Retry-After` blocked the flush for ten minutes and made twenty rejected requests, delivering nothing.
+
+  The insight the old code missed is that a rate limit is not a per-batch condition. Every remaining batch is charged against the same exhausted per-minute budget, so retrying one batch and moving on to the next are both guaranteed to fail for the identical reason. The server states this exactly once, in `Retry-After`, and the client's job is to believe it.
+
+  Now: a 429 returns immediately, both the disk and memory drains stop for the cycle, and a single process-wide cooldown suppresses every send — including the pending session-end drain, since session-ends are events too and would only earn another 429 — until the window elapses. `Retry-After` is clamped to 300 seconds, because the server's own bucket is 60 and a larger value means a misconfigured proxy or a hostile endpoint rather than a real instruction.
+
+- **Rate-limited events are moved to the durable disk queue, including the ones still in memory.** A cooldown can run for a minute, and leaving the queue in memory would have it compete with newly tracked events for the memory budget — which is how being throttled quietly turns into losing data. Nothing is discarded: being told to wait is a reason to wait, not a reason to drop telemetry.
+
+**No API change.** `IBeaconTracker`, `BeaconTracker` and `BeaconOptions` are unchanged; this is delivery behaviour only. Minor rather than patch because flush timing is observable and worth signalling.
+
 ## [3.3.0] - 2026-06-04
 
 ### Added
